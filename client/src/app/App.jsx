@@ -466,90 +466,135 @@ export default function App() {
     return <PairingScreen onPaired={bootstrap} />;
   }
 
+  const sessionLoading = Boolean(sessionLoadingId && selectedSession?.id === sessionLoadingId);
+  const composerRunStatusForShell = composerRunStatus
+    ? { ...composerRunStatus, steerable: selectedRuntime?.steerable !== false }
+    : null;
+  const panelProps = {
+    topBarProps: {
+      selectedProject,
+      selectedSession,
+      connectionState,
+      desktopBridge: status.desktopBridge,
+      onMenu: () => setDrawerOpen(true),
+      onOpenDocs: () => setDocsOpen(true),
+      onGitAction: handleGitAction,
+      notificationSupported,
+      notificationEnabled,
+      onEnableNotifications: enableNotifications,
+      gitDisabled: !selectedProject || running
+    },
+    docsPanelProps: {
+      open: docsOpen,
+      docs: status.docs,
+      busy: docsBusy,
+      error: docsError,
+      onClose: () => setDocsOpen(false),
+      onConnect: handleConnectDocs,
+      onDisconnect: handleDisconnectDocs,
+      onOpenHome: handleOpenDocsHome,
+      onOpenAuth: handleOpenDocsAuth,
+      onRefresh: handleRefreshDocs
+    },
+    gitPanelProps: {
+      open: gitPanel.open,
+      action: gitPanel.action,
+      project: selectedProject,
+      onToast: showToast,
+      onClose: () => setGitPanel((current) => ({ ...current, open: false }))
+    },
+    recoveryCardProps: {
+      state: recoveryState,
+      onRetry: handleRetryConnection,
+      onSync: handleSync,
+      onPair: handleResetPairing,
+      onStatus: handleShowConnectionStatus
+    },
+    toastStackProps: {
+      toasts,
+      onDismiss: dismissToast
+    },
+    imagePreviewProps: {
+      image: previewImage,
+      onClose: () => setPreviewImage(null)
+    }
+  };
+  const drawerProps = {
+    open: drawerOpen,
+    onClose: () => setDrawerOpen(false),
+    projects,
+    selectedProject,
+    selectedSession,
+    expandedProjectIds,
+    sessionsByProject,
+    loadingProjectId,
+    runningById,
+    threadRuntimeById,
+    completedSessionIds,
+    onToggleProject: handleToggleProject,
+    onSelectSession: handleSelectSession,
+    onRenameSession: handleRenameSession,
+    onDeleteSession: handleDeleteSession,
+    onNewConversation: handleNewConversation,
+    onSync: handleSync,
+    syncing,
+    theme,
+    setTheme
+  };
+  const chatProps = {
+    messages,
+    selectedSession,
+    loading: sessionLoading,
+    loadError: sessionLoadError,
+    running,
+    now: activityClockNow,
+    onPreviewImage: setPreviewImage,
+    onDeleteMessage: handleDeleteMessage
+  };
+  const composerProps = {
+    composerRef,
+    input,
+    setInput,
+    selectedProject,
+    selectedSession,
+    onSubmit: handleSubmit,
+    running,
+    onAbort: handleAbort,
+    models: status.models,
+    selectedModel,
+    onSelectModel: setSelectedModel,
+    selectedReasoningEffort,
+    onSelectReasoningEffort: setSelectedReasoningEffort,
+    skills: status.skills,
+    selectedSkillPaths,
+    onToggleSkill: toggleSelectedSkill,
+    onSelectSkill: selectSkill,
+    onClearSkills: clearSelectedSkills,
+    permissionMode,
+    onSelectPermission: setPermissionMode,
+    attachments,
+    onUploadFiles: handleUploadFiles,
+    onRemoveAttachment: handleRemoveAttachment,
+    fileMentions,
+    onAddFileMention: addFileMention,
+    onRemoveFileMention: removeFileMention,
+    uploading,
+    contextStatus: visibleContextStatus,
+    runStatus: composerRunStatusForShell,
+    desktopBridge: status.desktopBridge,
+    queueDrafts,
+    onRestoreQueueDraft: restoreQueueDraft,
+    onRemoveQueueDraft: removeQueueDraft,
+    onSteerQueueDraft: steerQueueDraft
+  };
+
   return (
     <AppShell
       shellClass={shellClass}
-      status={status}
-      selectedProject={selectedProject}
-      selectedSession={selectedSession}
-      connectionState={connectionState}
-      running={running}
-      drawerOpen={drawerOpen}
-      docsOpen={docsOpen}
-      docsBusy={docsBusy}
-      docsError={docsError}
-      gitPanel={gitPanel}
-      theme={theme}
-      projects={projects}
-      expandedProjectIds={expandedProjectIds}
-      sessionsByProject={sessionsByProject}
-      loadingProjectId={loadingProjectId}
-      runningById={runningById}
-      threadRuntimeById={threadRuntimeById}
-      completedSessionIds={completedSessionIds}
-      syncing={syncing}
-      recoveryState={recoveryState}
-      toasts={toasts}
-      messages={messages}
-      sessionLoading={Boolean(sessionLoadingId && selectedSession?.id === sessionLoadingId)}
-      sessionLoadError={sessionLoadError}
-      activityClockNow={activityClockNow}
-      input={input}
-      setInput={setInput}
-      selectedModel={selectedModel}
-      setSelectedModel={setSelectedModel}
-      selectedReasoningEffort={selectedReasoningEffort}
-      setSelectedReasoningEffort={setSelectedReasoningEffort}
-      selectedSkillPaths={selectedSkillPaths}
-      permissionMode={permissionMode}
-      setPermissionMode={setPermissionMode}
-      attachments={attachments}
-      fileMentions={fileMentions}
-      uploading={uploading}
-      visibleContextStatus={visibleContextStatus}
-      composerRunStatus={composerRunStatus}
-      selectedRuntime={selectedRuntime}
-      queueDrafts={queueDrafts}
-      composerRef={composerRef}
-      previewImage={previewImage}
-      notificationSupported={notificationSupported}
-      notificationEnabled={notificationEnabled}
-      enableNotifications={enableNotifications}
-      dismissToast={dismissToast}
-      showToast={showToast}
-      setDrawerOpen={setDrawerOpen}
-      setDocsOpen={setDocsOpen}
-      setGitPanel={setGitPanel}
-      setTheme={setTheme}
-      setPreviewImage={setPreviewImage}
-      toggleSelectedSkill={toggleSelectedSkill}
-      selectSkill={selectSkill}
-      clearSelectedSkills={clearSelectedSkills}
-      addFileMention={addFileMention}
-      removeFileMention={removeFileMention}
-      restoreQueueDraft={restoreQueueDraft}
-      removeQueueDraft={removeQueueDraft}
-      steerQueueDraft={steerQueueDraft}
-      handleGitAction={handleGitAction}
-      handleToggleProject={handleToggleProject}
-      handleSelectSession={handleSelectSession}
-      handleRenameSession={handleRenameSession}
-      handleDeleteSession={handleDeleteSession}
-      handleNewConversation={handleNewConversation}
-      handleSync={handleSync}
-      handleConnectDocs={handleConnectDocs}
-      handleDisconnectDocs={handleDisconnectDocs}
-      handleOpenDocsHome={handleOpenDocsHome}
-      handleOpenDocsAuth={handleOpenDocsAuth}
-      handleRefreshDocs={handleRefreshDocs}
-      handleRetryConnection={handleRetryConnection}
-      handleResetPairing={handleResetPairing}
-      handleShowConnectionStatus={handleShowConnectionStatus}
-      handleDeleteMessage={handleDeleteMessage}
-      handleSubmit={handleSubmit}
-      handleAbort={handleAbort}
-      handleUploadFiles={handleUploadFiles}
-      handleRemoveAttachment={handleRemoveAttachment}
+      panelProps={panelProps}
+      drawerProps={drawerProps}
+      chatProps={chatProps}
+      composerProps={composerProps}
     />
   );
 }
