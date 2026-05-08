@@ -1015,6 +1015,7 @@ export function getActiveRuns() {
       status: run.status,
       turnId: run.turnId,
       steerable: Boolean(run.appTurnId),
+      source: 'headless-local',
       context: run.context || null
     }));
 }

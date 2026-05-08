@@ -12,6 +12,7 @@ import {
   isDraftSession,
   payloadRunKeys,
   sessionMessagesApiPath,
+  shouldDropRunningActivityWhenNoActiveRuns,
   shouldPreserveLocalRunsFromStatus
 } from './session-utils.js';
 
@@ -40,7 +41,6 @@ export function useTurnRuntime({
   defaultStatus,
   activePollsRef,
   turnRefreshTimersRef,
-  desktopIpcPendingRunsRef,
   selectedSessionRef,
   runningByIdRef,
   setRunningById,
@@ -82,7 +82,10 @@ export function useTurnRuntime({
         next[key] = {
           status: 'running',
           steerable: payload.steerable !== false,
-          updatedAt: payload.timestamp || payload.startedAt || new Date().toISOString()
+          updatedAt: payload.timestamp || payload.startedAt || new Date().toISOString(),
+          source: payload.source || null,
+          sessionId: payload.sessionId || null,
+          turnId: payload.turnId || payload.clientTurnId || null
         };
       }
       return next;
@@ -163,8 +166,7 @@ export function useTurnRuntime({
     const activeRuns = Array.isArray(nextStatus?.activeRuns) ? nextStatus.activeRuns : [];
     const shouldPreserveLocalRuns = shouldPreserveLocalRunsFromStatus({
       activePollCount: activePollsRef.current.size,
-      turnRefreshTimerCount: turnRefreshTimersRef.current.size,
-      desktopIpcPendingRunCount: desktopIpcPendingRunsRef.current.size
+      turnRefreshTimerCount: turnRefreshTimersRef.current.size
     });
 
     if (!activeRuns.length) {
@@ -187,9 +189,7 @@ export function useTurnRuntime({
         if (shouldPreserveLocalRuns) {
           return current;
         }
-        return current.filter(
-          (message) => !(message.role === 'activity' && (message.status === 'running' || message.status === 'queued'))
-        );
+        return current.filter((message) => !shouldDropRunningActivityWhenNoActiveRuns(message));
       });
       return;
     }
@@ -216,7 +216,7 @@ export function useTurnRuntime({
       const next = shouldPreserveLocalRuns ? { ...current, ...nextRuntime } : nextRuntime;
       return next;
     });
-  }, [activePollsRef, desktopIpcPendingRunsRef, runningByIdRef, setMessages, setRunningById, setThreadRuntimeById, turnRefreshTimersRef]);
+  }, [activePollsRef, runningByIdRef, setMessages, setRunningById, setThreadRuntimeById, turnRefreshTimersRef]);
 
   function payloadMatchesCurrentConversation(payload) {
     const current = selectedSessionRef.current;
@@ -236,39 +236,6 @@ export function useTurnRuntime({
       window.clearTimeout(timer);
       turnRefreshTimersRef.current.delete(turnId);
     }
-  }
-
-  function rememberDesktopIpcPendingRun(sessionId, pending) {
-    if (!sessionId || !pending?.message) {
-      return;
-    }
-    desktopIpcPendingRunsRef.current.set(sessionId, {
-      ...pending,
-      sessionId,
-      startedAt: pending.startedAt || new Date().toISOString()
-    });
-  }
-
-  function completeDesktopIpcPendingRun(sessionId) {
-    const pending = desktopIpcPendingRunsRef.current.get(sessionId);
-    if (!pending) {
-      return false;
-    }
-    desktopIpcPendingRunsRef.current.delete(sessionId);
-    const completedPayload = {
-      sessionId,
-      turnId: selectedSessionRef.current?.turnId || pending.clientTurnId || pending.turnId || null,
-      completedAt: new Date().toISOString()
-    };
-    clearRun(completedPayload);
-    if (pending.turnId && pending.turnId !== completedPayload.turnId) {
-      clearRun({ ...completedPayload, turnId: pending.turnId });
-    }
-    if (pending.clientTurnId && pending.clientTurnId !== completedPayload.turnId) {
-      clearRun({ ...completedPayload, turnId: pending.clientTurnId });
-    }
-    markSessionCompleteNotice(completedPayload);
-    return true;
   }
 
   async function refreshMessagesForPayload(payload) {
@@ -361,8 +328,6 @@ export function useTurnRuntime({
     clearSessionCompleteNotice,
     syncActiveRunsFromStatus,
     payloadMatchesCurrentConversation,
-    rememberDesktopIpcPendingRun,
-    completeDesktopIpcPendingRun,
     markTurnCompleted,
     scheduleTurnRefresh
   };

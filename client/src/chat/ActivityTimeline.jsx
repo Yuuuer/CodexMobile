@@ -1,7 +1,11 @@
-import { Bot, FileText, Pencil, Search, Terminal } from 'lucide-react';
-import { conciseActivityDetail } from './activity-model.js';
+import { BookOpenCheck, Bot, FileText, Pencil, Search, SquareTerminal } from 'lucide-react';
 import { ActivityFileSummary } from './ActivityFileSummary.jsx';
-import { activityBodyItemsForDisplay, activityDetailText } from './activity-timeline-model.js';
+import {
+  activityBodyItemsForDisplay,
+  activityDetailText,
+  activityStepDetailTitle,
+  isSkillActivityStep
+} from './activity-timeline-model.js';
 import { MarkdownContent } from './MarkdownContent.jsx';
 
 export function ActivityTimeline({ timeline, fileSummary }) {
@@ -97,7 +101,7 @@ function ActivityStepDetail({ step }) {
     const output = step.output || step.error || '';
     const failed = step.status === 'failed';
     const running = step.status === 'running';
-    const title = `${failed ? '本地任务失败' : running ? '正在处理本地任务' : '本地任务已处理'} ${conciseActivityDetail(command, 110)}`;
+    const title = activityStepDetailTitle(step);
     const shellText = [`$ ${command}`, output].filter(Boolean).join('\n\n');
     const statusText = failed && step.exitCode !== undefined && step.exitCode !== null
       ? `退出码 ${step.exitCode}`
@@ -109,6 +113,7 @@ function ActivityStepDetail({ step }) {
     return (
       <details className={`activity-command-detail ${failed ? 'is-failed' : ''}`}>
         <summary>
+          {activityStepIcon(step)}
           <span>{title}</span>
         </summary>
         <div className="activity-shell">
@@ -164,8 +169,11 @@ function SubagentActivityBlock({ item }) {
 }
 
 function activityMetaIcon(item) {
+  if ((item.items || []).some((step) => isSkillActivityStep(step))) {
+    return <BookOpenCheck size={13} strokeWidth={1.9} />;
+  }
   if (item.metaType === 'command') {
-    return <Terminal size={13} />;
+    return <SquareTerminal size={13} strokeWidth={1.9} />;
   }
   if (item.metaType === 'edit') {
     return <Pencil size={13} />;
@@ -175,6 +183,19 @@ function activityMetaIcon(item) {
   }
   if (item.metaType === 'subagent') {
     return <Bot size={13} />;
+  }
+  return <FileText size={13} />;
+}
+
+function activityStepIcon(step) {
+  if (isSkillActivityStep(step)) {
+    return <BookOpenCheck size={13} strokeWidth={1.9} />;
+  }
+  if (step.type === 'command') {
+    return <SquareTerminal size={13} strokeWidth={1.9} />;
+  }
+  if (step.type === 'search' || step.type === 'web_search') {
+    return <Search size={13} />;
   }
   return <FileText size={13} />;
 }

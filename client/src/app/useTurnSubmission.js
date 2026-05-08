@@ -43,7 +43,6 @@ export function useTurnSubmission({
   attachments,
   fileMentions,
   activePollsRef,
-  desktopIpcPendingRunsRef,
   runningById,
   runningByIdRef,
   setInput,
@@ -60,8 +59,7 @@ export function useTurnSubmission({
   markSessionCompleteNotice,
   markTurnCompleted,
   scheduleTurnRefresh,
-  loadQueueDrafts,
-  rememberDesktopIpcPendingRun
+  loadQueueDrafts
 }) {
   function applyTurnSession(turn, optimisticSessionId, projectId, previousSessionId) {
     const realSessionId = realSessionIdFromTurn(turn);
@@ -334,25 +332,15 @@ export function useTurnSubmission({
       });
       const resultTurnId = result.turnId || turnId;
       const resultSessionId = result.sessionId || optimisticSessionId;
-      if (result.desktopBridge?.mode === 'desktop-ipc') {
-        rememberDesktopIpcPendingRun(resultSessionId, {
-          message: displayMessage,
-          turnId: resultTurnId,
-          clientTurnId: turnId,
-          previousSessionId: draftSessionId || outgoingSessionId,
-          startedAt: submittedAt
-        });
+      if (resultTurnId !== turnId || resultSessionId !== optimisticSessionId || result.desktopBridge?.mode === 'desktop-ipc') {
         markRun({
           turnId: resultTurnId,
           sessionId: resultSessionId,
-          previousSessionId: draftSessionId || outgoingSessionId
+          previousSessionId: draftSessionId || outgoingSessionId,
+          clientTurnId: turnId,
+          source: result.desktopBridge?.mode === 'desktop-ipc' ? 'desktop-ipc' : null,
+          steerable: result.desktopBridge?.mode === 'desktop-ipc' ? false : undefined
         });
-        return {
-          turnId: resultTurnId,
-          optimisticSessionId,
-          projectId: project.id,
-          previousSessionId: draftSessionId || outgoingSessionId
-        };
       }
       pollTurnUntilComplete({
         turnId: resultTurnId,
@@ -410,12 +398,23 @@ export function useTurnSubmission({
       completedAt,
       timestamp: completedAt
     };
-    await apiFetch('/api/chat/abort', {
-      method: 'POST',
-      body: { sessionId: currentSession?.id || abortId, turnId: currentSession?.turnId || null }
-    }).catch(() => null);
-    for (const key of [abortId, abortPayload.sessionId, abortPayload.turnId, abortPayload.previousSessionId].filter(Boolean)) {
-      desktopIpcPendingRunsRef.current.delete(key);
+    try {
+      await apiFetch('/api/chat/abort', {
+        method: 'POST',
+        body: { sessionId: currentSession?.id || abortId, turnId: currentSession?.turnId || null }
+      });
+    } catch (error) {
+      setMessages((current) =>
+        upsertStatusMessage(current, {
+          ...abortPayload,
+          kind: 'turn',
+          status: 'failed',
+          label: '中止失败',
+          detail: error.message || '桌面端没有确认中止，请在电脑端查看。',
+          timestamp: new Date().toISOString()
+        })
+      );
+      return false;
     }
     clearRun(abortPayload);
     setMessages((current) => completeLocalAbortMessages(current, abortPayload));

@@ -24,7 +24,9 @@ import {
   emptyContextStatus,
   hasRunningKey,
   isDraftSession,
+  runningByIdWithSelectedActivity,
   selectedRunKeys,
+  selectedSessionIsRunning,
   upsertSessionInProject
 } from './session-utils.js';
 import { AppShell } from './AppShell.jsx';
@@ -101,7 +103,6 @@ export default function App() {
   const activePollsRef = useRef(new Set());
   const turnRefreshTimersRef = useRef(new Map());
   const sessionLivePollRef = useRef(false);
-  const desktopIpcPendingRunsRef = useRef(new Map());
   const bootstrapStartedRef = useRef(false);
   const drawerSyncAtRef = useRef(0);
   const composerRef = useRef(null);
@@ -136,9 +137,14 @@ export default function App() {
       ),
     [messages]
   );
+  const selectedRunning = selectedSessionIsRunning({ running, hasRunningActivity });
+  const drawerRunningById = useMemo(
+    () => runningByIdWithSelectedActivity(runningById, selectedSession, hasRunningActivity),
+    [runningById, selectedSession, hasRunningActivity]
+  );
   const composerRunStatus = useMemo(
-    () => buildComposerRunStatus(messages, running, activityClockNow),
-    [messages, running, activityClockNow]
+    () => buildComposerRunStatus(messages, selectedRunning, activityClockNow),
+    [messages, selectedRunning, activityClockNow]
   );
 
   useEffect(() => {
@@ -146,13 +152,13 @@ export default function App() {
   }, [selectedSession?.id]);
 
   useEffect(() => {
-    if (!running && !hasRunningActivity) {
+    if (!selectedRunning) {
       return undefined;
     }
     setActivityClockNow(Date.now());
     const timer = window.setInterval(() => setActivityClockNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [running, hasRunningActivity]);
+  }, [selectedRunning]);
 
   const {
     markRun,
@@ -161,15 +167,12 @@ export default function App() {
     clearSessionCompleteNotice,
     syncActiveRunsFromStatus,
     payloadMatchesCurrentConversation,
-    rememberDesktopIpcPendingRun,
-    completeDesktopIpcPendingRun,
     markTurnCompleted,
     scheduleTurnRefresh
   } = useTurnRuntime({
     defaultStatus: DEFAULT_STATUS,
     activePollsRef,
     turnRefreshTimersRef,
-    desktopIpcPendingRunsRef,
     selectedSessionRef,
     runningByIdRef,
     setRunningById,
@@ -202,11 +205,12 @@ export default function App() {
     sessionLivePollRef,
     selectedSessionRef,
     runningByIdRef,
-    desktopIpcPendingRunsRef,
     messagesRef,
+    markRun,
+    clearRun,
+    markSessionCompleteNotice,
     setContextStatus,
-    setMessages,
-    completeDesktopIpcPendingRun
+    setMessages
   });
 
   useEffect(() => {
@@ -402,7 +406,6 @@ export default function App() {
     attachments,
     fileMentions,
     activePollsRef,
-    desktopIpcPendingRunsRef,
     runningById,
     runningByIdRef,
     setInput,
@@ -419,12 +422,11 @@ export default function App() {
     markSessionCompleteNotice,
     markTurnCompleted,
     scheduleTurnRefresh,
-    loadQueueDrafts,
-    rememberDesktopIpcPendingRun
+    loadQueueDrafts
   });
 
   async function handleGitAction(action) {
-    if (!selectedProject || running) {
+    if (!selectedProject || selectedRunning) {
       return;
     }
     setGitPanel({ open: true, action });
@@ -461,6 +463,7 @@ export default function App() {
     desktopBridge: status.desktopBridge,
     syncing
   });
+  const topBarRuntime = selectedRuntime || (selectedRunning ? { status: 'running' } : null);
 
   if (!authenticated) {
     return <PairingScreen onPaired={bootstrap} />;
@@ -476,13 +479,14 @@ export default function App() {
       selectedSession,
       connectionState,
       desktopBridge: status.desktopBridge,
+      selectedRuntime: topBarRuntime,
       onMenu: () => setDrawerOpen(true),
       onOpenDocs: () => setDocsOpen(true),
       onGitAction: handleGitAction,
       notificationSupported,
       notificationEnabled,
       onEnableNotifications: enableNotifications,
-      gitDisabled: !selectedProject || running
+      gitDisabled: !selectedProject || selectedRunning
     },
     docsPanelProps: {
       open: docsOpen,
@@ -528,7 +532,7 @@ export default function App() {
     expandedProjectIds,
     sessionsByProject,
     loadingProjectId,
-    runningById,
+    runningById: drawerRunningById,
     threadRuntimeById,
     completedSessionIds,
     onToggleProject: handleToggleProject,
@@ -546,7 +550,7 @@ export default function App() {
     selectedSession,
     loading: sessionLoading,
     loadError: sessionLoadError,
-    running,
+    running: selectedRunning,
     now: activityClockNow,
     onPreviewImage: setPreviewImage,
     onDeleteMessage: handleDeleteMessage
@@ -558,7 +562,7 @@ export default function App() {
     selectedProject,
     selectedSession,
     onSubmit: handleSubmit,
-    running,
+    running: selectedRunning,
     onAbort: handleAbort,
     models: status.models,
     selectedModel,

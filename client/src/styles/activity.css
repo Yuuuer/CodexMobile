@@ -361,6 +361,11 @@
   user-select: none;
 }
 
+.activity-command-detail summary svg {
+  flex: 0 0 auto;
+  opacity: 0.74;
+}
+
 .activity-command-detail summary::-webkit-details-marker {
   display: none;
 }

@@ -4,10 +4,9 @@ import {
   messageStreamSignature
 } from '../chat/activity-model.js';
 import {
-  desktopThreadHasAssistantAfterLocalSend,
-  desktopThreadHasAssistantAfterPendingSend,
   mergeLiveSelectedThreadMessages,
-  shouldPollSelectedSessionMessages
+  shouldPollSelectedSessionMessages,
+  syncDesktopActivityRuntimeFromMessages
 } from '../session-live-refresh.js';
 import { mergeContextStatus } from './context-status.js';
 import {
@@ -28,11 +27,12 @@ export function useSessionLivePolling({
   sessionLivePollRef,
   selectedSessionRef,
   runningByIdRef,
-  desktopIpcPendingRunsRef,
   messagesRef,
+  markRun,
+  clearRun,
+  markSessionCompleteNotice,
   setContextStatus,
-  setMessages,
-  completeDesktopIpcPendingRun
+  setMessages
 }) {
   useEffect(() => {
     if (!authenticated || !selectedSession?.id || isDraftSession(selectedSession)) {
@@ -55,10 +55,9 @@ export function useSessionLivePolling({
       const hasDesktopThreadRuntime =
         selectedSessionRef.current?.runtime?.status === 'running' ||
         selectedSession.runtime?.status === 'running' ||
-        selectedRunRuntime?.source === 'desktop-thread';
-      const hasExternalThreadRefresh =
-        Boolean(desktopIpcPendingRunsRef.current.get(sessionId)) ||
-        Boolean(hasDesktopThreadRuntime);
+        selectedRunRuntime?.source === 'desktop-thread' ||
+        selectedRunRuntime?.source === 'desktop-ipc';
+      const hasExternalThreadRefresh = Boolean(hasDesktopThreadRuntime);
       if (!shouldPollSelectedSessionMessages({
         hasSelectedRunning,
         desktopBridge,
@@ -70,23 +69,20 @@ export function useSessionLivePolling({
       try {
         const data = await apiFetch(sessionMessagesApiPath(sessionId));
         if (!stopped && selectedSessionRef.current?.id === sessionId && Array.isArray(data.messages)) {
-          const pendingDesktopRun = desktopIpcPendingRunsRef.current.get(sessionId) || null;
-          const shouldCompleteDesktopRun =
-            hasSelectedRunning &&
-            desktopBridge?.mode === 'desktop-ipc' &&
-            (
-              desktopThreadHasAssistantAfterPendingSend(pendingDesktopRun, data.messages) ||
-              desktopThreadHasAssistantAfterLocalSend(messagesRef.current, data.messages)
-            );
+          syncDesktopActivityRuntimeFromMessages({
+            messages: data.messages,
+            sessionId,
+            selectedRunRuntime,
+            markRun,
+            clearRun,
+            markSessionCompleteNotice
+          });
           setContextStatus((current) => mergeContextStatus(current, data.context || defaultStatus.context, defaultStatus.context));
           setMessages((current) =>
             messageStreamSignature(current) === messageStreamSignature(data.messages)
               ? current
               : mergeLiveSelectedThreadMessages(current, data.messages)
           );
-          if (shouldCompleteDesktopRun) {
-            completeDesktopIpcPendingRun(sessionId);
-          }
         }
       } catch {
         // Keep the currently rendered conversation if a transient poll fails.

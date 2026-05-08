@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { activityBodyItemsForDisplay, buildActivityTimeline } from './chat/activity-timeline-model.js';
+import {
+  activityBodyItemsForDisplay,
+  activityStepDetailTitle,
+  buildActivityTimeline,
+  isSkillActivityStep
+} from './chat/activity-timeline-model.js';
 
 test('activity body keeps tool steps without detail when mixed with detailed steps', () => {
   const commandStep = {
@@ -64,4 +69,82 @@ test('activity timeline keeps tool batches next to their matching commentary', (
   );
   assert.equal(timeline[1].items[0].command, 'git status --short');
   assert.equal(timeline[3].items[0].command, 'npm run build');
+});
+
+test('activity step detail titles describe read and search commands semantically', () => {
+  const timeline = buildActivityTimeline([
+    {
+      id: 'read-1',
+      kind: 'command_execution',
+      label: '本地任务已处理',
+      command: "sed -n '1,220p' /Users/xiayanghui/编程项目/CodexMobile/client/src/App.jsx",
+      status: 'completed'
+    },
+    {
+      id: 'search-1',
+      kind: 'command_execution',
+      label: '本地任务已处理',
+      command: 'rg -n "completedSessionIds|markSessionCompleteNotice" client/src/app',
+      status: 'completed'
+    }
+  ], false);
+
+  assert.equal(timeline[0].items[0].type, 'explore');
+  assert.equal(activityStepDetailTitle(timeline[0].items[0]), '读取 client/src/App.jsx');
+  assert.equal(timeline[0].items[1].type, 'search');
+  assert.equal(activityStepDetailTitle(timeline[0].items[1]), '搜索 completedSessionIds|markSessionCompleteNotice');
+});
+
+test('single command activity uses desktop-style run title', () => {
+  const timeline = buildActivityTimeline([
+    {
+      id: 'command-1',
+      kind: 'command_execution',
+      label: '本地任务已处理',
+      command: 'npm run build',
+      status: 'completed'
+    }
+  ], false);
+
+  assert.equal(timeline[0].title, '已运行 npm run build');
+  assert.equal(activityStepDetailTitle(timeline[0].items[0]), '已运行 npm run build');
+});
+
+test('skill reads use skill names instead of raw SKILL.md paths', () => {
+  const timeline = buildActivityTimeline([
+    {
+      id: 'skill-1',
+      kind: 'command_execution',
+      label: '本地任务已处理',
+      command: "sed -n '1,180p' /Users/xiayanghui/.codex/plugins/cache/openai-curated/superpowers/f812c146/skills/verification-before-completion/SKILL.md",
+      status: 'completed'
+    }
+  ], false);
+
+  assert.equal(timeline[0].title, '读取 Verification Before Completion 技能');
+  assert.equal(activityStepDetailTitle(timeline[0].items[0]), '读取 Verification Before Completion 技能');
+  assert.equal(isSkillActivityStep(timeline[0].items[0]), true);
+});
+
+test('activity timeline counts command actions instead of paths found in output', () => {
+  const timeline = buildActivityTimeline([
+    {
+      id: 'search-1',
+      kind: 'command_execution',
+      label: '本地任务已处理',
+      command: 'rg -n "markSessionCompleteNotice" client/src',
+      output: 'client/src/app/App.jsx:1:markSessionCompleteNotice\nclient/src/app/useTurnRuntime.js:2:markSessionCompleteNotice',
+      status: 'completed'
+    },
+    {
+      id: 'read-1',
+      kind: 'command_execution',
+      label: '本地任务已处理',
+      command: "sed -n '1,80p' client/src/app/App.jsx",
+      output: "import x from './useTurnRuntime.js';",
+      status: 'completed'
+    }
+  ], false);
+
+  assert.equal(timeline[0].title, '已搜索 1 次，已探索 1 个文件');
 });

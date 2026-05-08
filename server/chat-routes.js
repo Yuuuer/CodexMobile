@@ -69,8 +69,12 @@ export function createChatRouteHandler({
 
     if (method === 'POST' && pathname === '/api/chat/abort') {
       const body = await readBody(req);
-      const aborted = chatService.abortChat(body, { remoteAddress: remoteAddress(req) });
-      sendJson(res, aborted ? 200 : 404, { aborted });
+      try {
+        const aborted = await chatService.abortChat(body, { remoteAddress: remoteAddress(req) });
+        sendJson(res, aborted ? 200 : 404, { aborted });
+      } catch (error) {
+        sendJson(res, error.statusCode || 500, { error: error.message || 'Failed to abort chat' });
+      }
       return true;
     }
 

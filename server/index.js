@@ -167,6 +167,7 @@ const chatService = createChatService({
   getCacheSnapshot,
   getDesktopBridgeStatus,
   listProjectSessions,
+  readSessionMessages,
   refreshCodexCache,
   renameSession,
   broadcast,
@@ -279,7 +280,7 @@ async function publicStatus(authenticated) {
     voiceRealtime: publicVoiceRealtimeStatus(config),
     docs: await feishuIntegration.publicDocsStatus(authenticated),
     syncedAt: snapshot.syncedAt,
-    activeRuns: [...getActiveRuns(), ...chatService.getActiveImageRuns()],
+    activeRuns: [...getActiveRuns(), ...chatService.getActiveDesktopIpcRuns(), ...chatService.getActiveImageRuns()],
     auth: {
       required: true,
       authenticated,

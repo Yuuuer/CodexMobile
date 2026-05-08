@@ -3,28 +3,16 @@ import { useEffect, useRef, useState } from 'react';
 import { copyTextToClipboard } from '../utils/clipboard.js';
 import { isDraftSession } from '../app/session-utils.js';
 import { FeishuLogoIcon } from './DocsPanel.jsx';
+import { bridgeConnectionLabel } from './topbar-status.js';
 
-const CONNECTION_STATUS = {
-  connected: { label: '已连接', className: 'is-connected' },
-  connecting: { label: '连接中', className: 'is-connecting' },
-  disconnected: { label: '已断开', className: 'is-disconnected' }
-};
-
-export function bridgeConnectionLabel(connectionState, desktopBridge) {
-  if (connectionState !== 'connected') {
-    return CONNECTION_STATUS[connectionState] || CONNECTION_STATUS.disconnected;
-  }
-  if (desktopBridge?.mode === 'headless-local') {
-    return { label: '后台 Codex', className: 'is-connected is-headless' };
-  }
-  return CONNECTION_STATUS.connected;
-}
+export { bridgeConnectionLabel } from './topbar-status.js';
 
 export function TopBar({
   selectedProject,
   selectedSession,
   connectionState,
   desktopBridge,
+  selectedRuntime,
   onMenu,
   onOpenDocs,
   onGitAction,
@@ -33,7 +21,7 @@ export function TopBar({
   onEnableNotifications,
   gitDisabled = false
 }) {
-  const status = bridgeConnectionLabel(connectionState, desktopBridge);
+  const status = bridgeConnectionLabel(connectionState, desktopBridge, { selectedSession, selectedRuntime });
   const [menuOpen, setMenuOpen] = useState(false);
   const [copiedThreadId, setCopiedThreadId] = useState(false);
   const menuRef = useRef(null);
@@ -99,7 +87,7 @@ export function TopBar({
       </button>
       <div className="top-title">
         <strong>{title}</strong>
-        <span className={`connection-status ${status.className}`}>
+        <span className={`connection-status ${status.className}`} title={status.description} aria-label={status.description || status.label}>
           <Wifi size={13} />
           {status.label}
         </span>

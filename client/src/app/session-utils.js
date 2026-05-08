@@ -285,7 +285,7 @@ export function autoTitlePatch(title, phase = 'provisional') {
 }
 
 export function payloadRunKeys(payload) {
-  return [payload?.turnId, payload?.sessionId, payload?.previousSessionId].filter(Boolean);
+  return [payload?.turnId, payload?.clientTurnId, payload?.sessionId, payload?.previousSessionId].filter(Boolean);
 }
 
 export function selectedRunKeys(session) {
@@ -310,6 +310,17 @@ export function hasRunningKey(runningById, keys) {
 
 export function sessionRunKeys(session) {
   return [session?.id, session?.turnId, session?.previousSessionId].filter(Boolean);
+}
+
+export function runningByIdWithSelectedActivity(runningById = {}, selectedSession = null, hasRunningActivity = false) {
+  if (!hasRunningActivity || !selectedSession?.id) {
+    return runningById || {};
+  }
+  const next = { ...(runningById || {}) };
+  for (const key of sessionRunKeys(selectedSession)) {
+    next[key] = true;
+  }
+  return next;
 }
 
 export function sessionRunBadgeState(session, {
@@ -339,10 +350,23 @@ export function sessionRunBadgeState(session, {
 
 export function shouldPreserveLocalRunsFromStatus({
   activePollCount = 0,
-  turnRefreshTimerCount = 0,
-  desktopIpcPendingRunCount = 0
+  turnRefreshTimerCount = 0
 } = {}) {
-  return activePollCount > 0 || turnRefreshTimerCount > 0 || desktopIpcPendingRunCount > 0;
+  return activePollCount > 0 || turnRefreshTimerCount > 0;
+}
+
+export function shouldDropRunningActivityWhenNoActiveRuns(message) {
+  if (message?.role !== 'activity') {
+    return false;
+  }
+  if (!['running', 'queued'].includes(String(message?.status || ''))) {
+    return false;
+  }
+  return String(message?.kind || '') !== 'desktop';
+}
+
+export function selectedSessionIsRunning({ running = false, hasRunningActivity = false } = {}) {
+  return Boolean(running || hasRunningActivity);
 }
 
 function compactComposerActivityText(value, maxLength = 28) {

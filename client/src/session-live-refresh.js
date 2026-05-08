@@ -1,4 +1,4 @@
-import { sameUserMessageContent, userMessageIdentity } from './chat/message-identity.js';
+import { sameUserMessageContent } from './chat/message-identity.js';
 
 function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -14,6 +14,10 @@ function isPendingLocalMessage(message) {
 
 function messageRunKeys(message) {
   return [message?.turnId, message?.sessionId, message?.previousSessionId].filter(Boolean).map(String);
+}
+
+function isRunningStatus(value) {
+  return ['running', 'queued'].includes(String(value || ''));
 }
 
 function messageMatchesRunKeys(message, keys) {
@@ -82,6 +86,112 @@ function desktopBridgeUsesExternalThreadRefresh(bridge = null) {
   return Boolean(bridge?.connected && bridge?.mode === 'desktop-ipc');
 }
 
+export function desktopRunningActivityPayload(messages = [], sessionId = '') {
+  if (!Array.isArray(messages)) {
+    return null;
+  }
+  const targetSessionId = String(sessionId || '');
+  const runningActivity = messages
+    .filter((message) => {
+      if (message?.role !== 'activity' || String(message?.kind || '') !== 'desktop') {
+        return false;
+      }
+      if (!isRunningStatus(message?.status)) {
+        return false;
+      }
+      if (!targetSessionId) {
+        return true;
+      }
+      return messageRunKeys(message).includes(targetSessionId);
+    })
+    .at(-1);
+
+  if (!runningActivity) {
+    return null;
+  }
+
+  return {
+    source: 'desktop-thread',
+    sessionId: runningActivity.sessionId || targetSessionId || null,
+    turnId: runningActivity.turnId || runningActivity.sessionId || targetSessionId || null,
+    startedAt: runningActivity.startedAt || runningActivity.timestamp || null,
+    timestamp: runningActivity.timestamp || runningActivity.startedAt || new Date().toISOString(),
+    steerable: false
+  };
+}
+
+function desktopCompletedActivityPayload(messages = [], sessionId = '', selectedRunRuntime = null) {
+  if (!Array.isArray(messages) || selectedRunRuntime?.status !== 'running' || selectedRunRuntime?.source !== 'desktop-thread') {
+    return null;
+  }
+  const targetSessionId = String(sessionId || '');
+  const targetTurnId = String(selectedRunRuntime?.turnId || '');
+  const completedActivity = messages
+    .filter((message) => {
+      if (message?.role !== 'activity' || String(message?.kind || '') !== 'desktop') {
+        return false;
+      }
+      if (String(message?.status || '') !== 'completed') {
+        return false;
+      }
+      const keys = messageRunKeys(message);
+      if (targetTurnId && keys.includes(targetTurnId)) {
+        return true;
+      }
+      return targetSessionId ? keys.includes(targetSessionId) : true;
+    })
+    .at(-1);
+
+  if (!completedActivity) {
+    return null;
+  }
+
+  return {
+    source: 'desktop-thread',
+    sessionId: completedActivity.sessionId || targetSessionId || null,
+    turnId: completedActivity.turnId || selectedRunRuntime.turnId || null,
+    completedAt: completedActivity.completedAt || completedActivity.timestamp || new Date().toISOString(),
+    timestamp: completedActivity.timestamp || completedActivity.completedAt || new Date().toISOString()
+  };
+}
+
+export function syncDesktopActivityRuntimeFromMessages({
+  messages = [],
+  sessionId = '',
+  selectedRunRuntime = null,
+  markRun = null,
+  clearRun = null,
+  markSessionCompleteNotice = null
+} = {}) {
+  const payload = desktopRunningActivityPayload(messages, sessionId);
+  if (payload) {
+    markRun?.(payload);
+    return 'marked';
+  }
+
+  const completedPayload = desktopCompletedActivityPayload(messages, sessionId, selectedRunRuntime);
+  if (completedPayload) {
+    clearRun?.({
+      source: 'desktop-thread',
+      sessionId,
+      turnId: selectedRunRuntime.turnId || null
+    });
+    markSessionCompleteNotice?.(completedPayload);
+    return 'completed';
+  }
+
+  if (selectedRunRuntime?.status === 'running' && selectedRunRuntime?.source === 'desktop-thread') {
+    clearRun?.({
+      source: 'desktop-thread',
+      sessionId,
+      turnId: selectedRunRuntime.turnId || null
+    });
+    return 'cleared';
+  }
+
+  return 'idle';
+}
+
 export function shouldPollSelectedSessionMessages({
   hasSelectedRunning = false,
   desktopBridge = null,
@@ -129,45 +239,6 @@ export function mergeLiveSelectedThreadMessages(current = [], loaded = []) {
   return preserveLocalActivityMessages(current, [...loaded, ...pending]).sort(
     (a, b) => new Date(a?.timestamp || 0).getTime() - new Date(b?.timestamp || 0).getTime()
   );
-}
-
-export function desktopThreadHasAssistantAfterLocalSend(current = [], loaded = []) {
-  if (!Array.isArray(current) || !Array.isArray(loaded) || !current.length || !loaded.length) {
-    return false;
-  }
-  const pendingUsers = current.filter((message) => message?.role === 'user' && isPendingLocalMessage(message));
-  if (!pendingUsers.length) {
-    return false;
-  }
-  let matchedPendingUser = false;
-  for (const message of loaded) {
-    if (message?.role === 'user' && pendingUsers.some((pending) => sameUserMessageContent(pending.content, message.content))) {
-      matchedPendingUser = true;
-      continue;
-    }
-    if (matchedPendingUser && message?.role === 'assistant' && normalizeText(message.content)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-export function desktopThreadHasAssistantAfterPendingSend(pending = null, loaded = []) {
-  const pendingText = userMessageIdentity(pending?.message);
-  if (!pendingText || !Array.isArray(loaded) || !loaded.length) {
-    return false;
-  }
-  let matchedPendingUser = false;
-  for (const message of loaded) {
-    if (message?.role === 'user' && userMessageIdentity(message.content) === pendingText) {
-      matchedPendingUser = true;
-      continue;
-    }
-    if (matchedPendingUser && message?.role === 'assistant' && normalizeText(message.content)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 export function applySessionRenameToProjectSessions(current = {}, payload = {}) {

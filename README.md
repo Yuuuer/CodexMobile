@@ -266,7 +266,7 @@ npm run build
 - `GET /api/projects/:projectId/sessions`
 - `PATCH /api/projects/:projectId/sessions/:sessionId`
 - `DELETE /api/projects/:projectId/sessions/:sessionId`
-- `GET /api/chat/turns/:sessionId`
+- `GET /api/chat/turns/:turnId`
 - `POST /api/chat/send`
 - `POST /api/chat/abort`
 - `GET /api/chat/queue`

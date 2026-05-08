@@ -1,15 +1,4 @@
-import crypto from 'node:crypto';
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import {
-  normalizeFileMentions,
-  normalizeAttachments,
-  withFileMentionReferences,
-  withAttachmentReferences,
-  withImageAttachmentPreviews
-} from './upload-service.js';
-import {
-  defaultProjectlessWorkspaceRoot,
   registerProjectlessThread as registerProjectlessThreadInCodexState
 } from './codex-config.js';
 import { registerMobileSession as registerMobileSessionInIndex } from './mobile-session-index.js';
@@ -21,88 +10,15 @@ import {
   runQueuedHeadlessChatJob,
   sendViaDesktopIpc
 } from './chat-delivery.js';
+import {
+  prepareChatRequest,
+  projectlessThreadWorkingDirectory
+} from './chat-request-prep.js';
 import { createChatImageHandler } from './chat-image-handler.js';
+import { createChatAutoNamer } from './chat-auto-title.js';
+import { createDesktopTurnMonitor } from './desktop-turn-monitor.js';
 
-function dateStamp(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function slugFromMessage(message, fallback = 'mobile-chat') {
-  const ascii = String(message || '')
-    .normalize('NFKD')
-    .replace(/[^\w\s-]/g, '')
-    .trim()
-    .replace(/[_\s]+/g, '-')
-    .replace(/-+/g, '-')
-    .toLowerCase()
-    .slice(0, 48);
-  return ascii || fallback;
-}
-
-async function projectlessThreadWorkingDirectory(project, message) {
-  const root = path.resolve(project?.path || defaultProjectlessWorkspaceRoot());
-  const day = dateStamp();
-  const slug = slugFromMessage(message);
-  const unique = `${slug}-${Date.now().toString(36)}`;
-  const cwd = path.join(root, day, unique);
-  await fs.mkdir(cwd, { recursive: true });
-  return cwd;
-}
-
-export function normalizeSelectedSkills(value, availableSkills = []) {
-  const requested = Array.isArray(value) ? value : [];
-  if (!requested.length || !Array.isArray(availableSkills) || !availableSkills.length) {
-    return [];
-  }
-
-  const byPath = new Map();
-  const byName = new Map();
-  for (const skill of availableSkills) {
-    if (skill?.path) {
-      byPath.set(String(skill.path), skill);
-    }
-    if (skill?.name) {
-      byName.set(String(skill.name), skill);
-    }
-  }
-
-  const selected = [];
-  const seen = new Set();
-  for (const item of requested) {
-    const pathValue = typeof item === 'string' ? item : item?.path;
-    const nameValue = typeof item === 'string' ? item : item?.name;
-    const skill = byPath.get(String(pathValue || '')) || byName.get(String(nameValue || ''));
-    if (!skill?.path || seen.has(skill.path)) {
-      continue;
-    }
-    seen.add(skill.path);
-    selected.push({
-      type: 'skill',
-      name: skill.name || skill.label || path.basename(path.dirname(skill.path)),
-      path: skill.path
-    });
-  }
-  return selected.slice(0, 8);
-}
-
-function normalizeCollaborationMode(value, { model = '', reasoningEffort = null } = {}) {
-  const requestedMode = typeof value === 'string' ? value : value?.mode;
-  if (String(requestedMode || '').trim().toLowerCase() !== 'plan') {
-    return null;
-  }
-  const settings = typeof value === 'object' && value?.settings ? value.settings : {};
-  return {
-    mode: 'plan',
-    settings: {
-      model: String(settings.model ?? model ?? '').trim(),
-      reasoning_effort: settings.reasoning_effort ?? settings.reasoningEffort ?? reasoningEffort ?? null,
-      developer_instructions: settings.developer_instructions ?? null
-    }
-  };
-}
+export { normalizeSelectedSkills } from './chat-request-prep.js';
 
 export function createChatService({
   imagePromptState,
@@ -112,6 +28,7 @@ export function createChatService({
   getCacheSnapshot,
   getDesktopBridgeStatus,
   listProjectSessions,
+  readSessionMessages = async () => ({ messages: [] }),
   refreshCodexCache,
   renameSession,
   broadcast,
@@ -146,9 +63,22 @@ export function createChatService({
     rememberTurn,
     emitJobEvent: (job, payload) => emitJobEvent(job, payload)
   });
+  const desktopTurnMonitor = createDesktopTurnMonitor({
+    readSessionMessages,
+    refreshCodexCache,
+    rememberTurn,
+    broadcast
+  });
 
   function sessionHasActiveWork(sessionId) {
-    return chatQueue.sessionHasActiveWork(sessionId, [...getActiveRuns(), ...chatImage.getActiveImageRuns()]);
+    return (
+      chatQueue.sessionHasActiveWork(sessionId, [
+        ...getActiveRuns(),
+        ...chatImage.getActiveImageRuns(),
+        ...desktopTurnMonitor.getActiveRuns()
+      ]) ||
+      desktopTurnMonitor.hasActiveWork(sessionId)
+    );
   }
 
   function emitJobEvent(job, payload) {
@@ -157,39 +87,14 @@ export function createChatService({
     broadcast(enriched);
   }
 
-  async function autoNameCompletedSession({ sessionId, turnId, userMessage }) {
-    if (!sessionId || !turnId) {
-      return;
-    }
-    const turn = chatQueue.getTurn(turnId) || {};
-    const assistantMessage = turn.assistantPreview || '';
-    if (!String(userMessage || assistantMessage || '').trim()) {
-      return;
-    }
-
-    await refreshCodexCache();
-    const session = getSession(sessionId);
-    if (!session || session.titleLocked) {
-      return;
-    }
-
-    const renamed = await maybeAutoNameSession({
-      session,
-      userMessage,
-      assistantMessage,
-      renameSessionImpl: renameSession
-    });
-    if (renamed) {
-      const snapshot = await refreshCodexCache();
-      broadcast({ type: 'sync-complete', syncedAt: snapshot.syncedAt, projects: snapshot.projects });
-    }
-  }
-
-  function scheduleAutoNameCompletedSession(payload) {
-    autoNameCompletedSession(payload).catch((error) => {
-      console.warn('[title] auto naming failed:', error.message);
-    });
-  }
+  const { scheduleAutoNameCompletedSession } = createChatAutoNamer({
+    getTurn: chatQueue.getTurn,
+    refreshCodexCache,
+    getSession,
+    maybeAutoNameSession,
+    renameSession,
+    broadcast
+  });
 
   async function steerQueuedDraft(query = {}) {
     const draft = chatQueue.removeQueuedDraft(query);
@@ -287,46 +192,36 @@ export function createChatService({
       error.statusCode = 404;
       throw error;
     }
-    const attachments = normalizeAttachments(body.attachments);
-    const fileMentions = normalizeFileMentions(body.fileMentions);
-    const message = String(body.message || '').trim();
-    if (!message && !attachments.length) {
-      const error = new Error('message or attachments are required');
-      error.statusCode = 400;
-      throw error;
-    }
+    const config = getCacheSnapshot().config || {};
+    const {
+      attachments,
+      fileMentions,
+      requestedSessionId,
+      draftSessionId,
+      selectedSessionId,
+      turnId,
+      sendMode,
+      selectedSkills,
+      modelForTurn,
+      reasoningEffortForTurn,
+      collaborationMode,
+      displayMessage,
+      visibleMessage,
+      codexMessage,
+      conversationSessionId
+    } = prepareChatRequest(body, {
+      getSession,
+      config,
+      defaultReasoningEffort
+    });
     let bridge = await assertDesktopBridgeAvailable(getDesktopBridgeStatus);
 
-    const requestedSessionId = String(body.sessionId || '').trim();
-    const isDraftSession = requestedSessionId.startsWith('draft-');
-    const session = requestedSessionId && !isDraftSession ? getSession(requestedSessionId) : null;
-    const draftSessionId = String(body.draftSessionId || '').trim() || null;
-    const selectedSessionId = session && !session.mobileOnly
-      ? session.id
-      : (requestedSessionId && !isDraftSession ? requestedSessionId : null);
-    const turnId = String(body.clientTurnId || '').trim() || crypto.randomUUID();
-    const sendMode = String(body.sendMode || body.mode || 'start').trim();
-    const config = getCacheSnapshot().config || {};
-    const selectedSkills = normalizeSelectedSkills(body.selectedSkills, config.skills);
-    const modelForTurn = session?.model || body.model || config.model || 'gpt-5.5';
-    const reasoningEffortForTurn = body.reasoningEffort || defaultReasoningEffort;
-    const collaborationMode = normalizeCollaborationMode(body.collaborationMode, {
-      model: modelForTurn,
-      reasoningEffort: reasoningEffortForTurn
-    });
-    const displayMessage = message || '请查看附件。';
-    const visibleMessage = withImageAttachmentPreviews(displayMessage, attachments);
-    const codexMessage = withFileMentionReferences(
-      withAttachmentReferences(displayMessage, attachments),
-      fileMentions
-    );
     const imagePrompt = chatImage.resolveImagePrompt({
       enabled: useLegacyImageGenerator(),
       projectId: project.id,
       displayMessage,
       attachments
     });
-    const conversationSessionId = selectedSessionId || draftSessionId || null;
     const queueKey = resolveConversationKey(selectedSessionId, draftSessionId, requestedSessionId);
     const shouldHoldInLocalQueue =
       sendMode === 'queue' &&
@@ -367,7 +262,7 @@ export function createChatService({
         bridge = backgroundFallbackBridge(bridge, '桌面端还不能从手机新建真实桌面线程，已改用后台 Codex 新建。');
       } else {
         try {
-          return await sendViaDesktopIpc({
+          const result = await sendViaDesktopIpc({
             bridge,
             project,
             selectedSessionId,
@@ -390,6 +285,17 @@ export function createChatService({
             startDesktopFollowerTurn,
             interruptDesktopFollowerTurn
           });
+          desktopTurnMonitor.startRun({
+            projectId: project.id,
+            sessionId: result.sessionId,
+            previousSessionId: draftSessionId || selectedSessionId || null,
+            draftSessionId,
+            turnId: result.turnId,
+            clientTurnId: result.clientTurnId || turnId,
+            userMessage: visibleMessage,
+            startedAt: new Date().toISOString()
+          });
+          return result;
         } catch (error) {
           if (error?.code !== 'CODEXMOBILE_DESKTOP_THREAD_OWNER_UNAVAILABLE' || !desktopIpcCanUseBackgroundFallback(bridge)) {
             throw error;
@@ -526,12 +432,63 @@ export function createChatService({
     };
   }
 
-  function abortChat(body = {}, { remoteAddress = '' } = {}) {
+  async function abortChat(body = {}, { remoteAddress = '' } = {}) {
     const turnId = String(body.turnId || '').trim();
     const sessionId = String(body.sessionId || '').trim();
     const previousSessionId = String(body.previousSessionId || '').trim();
     console.log(`[chat] abort request remote=${remoteAddress} turn=${turnId} session=${sessionId}`);
+    const desktopRun = desktopTurnMonitor.getRun(turnId) || desktopTurnMonitor.getRun(sessionId);
+    if (desktopRun) {
+      if (!interruptDesktopFollowerTurn) {
+        const error = new Error('桌面端中止能力不可用，请在电脑端手动停止。');
+        error.statusCode = 502;
+        throw error;
+      }
+      try {
+        await interruptDesktopFollowerTurn(desktopRun.sessionId);
+      } catch (error) {
+        const wrapped = new Error(`桌面端中止失败：${error.message || '请在电脑端手动停止。'}`);
+        wrapped.statusCode = error.statusCode || 502;
+        throw wrapped;
+      }
+      return desktopTurnMonitor.abortRun(turnId) || desktopTurnMonitor.abortRun(sessionId);
+    }
+
     const aborted = abortCodexTurn(turnId || sessionId);
+    if (!aborted && sessionId && interruptDesktopFollowerTurn) {
+      const bridge = await getDesktopBridgeStatus().catch(() => null);
+      if (bridge?.connected && bridge.mode === 'desktop-ipc') {
+        try {
+          await interruptDesktopFollowerTurn(sessionId);
+        } catch (error) {
+          const wrapped = new Error(`桌面端中止失败：${error.message || '请在电脑端手动停止。'}`);
+          wrapped.statusCode = error.statusCode || 502;
+          throw wrapped;
+        }
+        const completedAt = new Date().toISOString();
+        const payload = {
+          type: 'chat-aborted',
+          source: 'desktop-thread',
+          projectId: body.projectId || undefined,
+          sessionId,
+          previousSessionId: previousSessionId || undefined,
+          turnId: turnId || sessionId,
+          completedAt,
+          timestamp: completedAt
+        };
+        rememberTurn(payload.turnId, {
+          projectId: payload.projectId,
+          sessionId: payload.sessionId,
+          previousSessionId: payload.previousSessionId,
+          source: 'desktop-thread',
+          status: 'aborted',
+          label: '已中止',
+          completedAt
+        });
+        broadcast(payload);
+        return true;
+      }
+    }
     if (!turnId && !aborted) {
       return false;
     }
@@ -560,6 +517,7 @@ export function createChatService({
 
   return {
     abortChat,
+    getActiveDesktopIpcRuns: desktopTurnMonitor.getActiveRuns,
     getActiveImageRuns: chatImage.getActiveImageRuns,
     getTurn(turnId) {
       return chatQueue.getTurn(turnId);

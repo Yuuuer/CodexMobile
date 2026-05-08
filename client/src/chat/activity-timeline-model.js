@@ -131,8 +131,11 @@ function describeActivityStep(step) {
   const label = String(step?.label || '').trim();
   const toolName = String(step?.toolName || '').trim();
   const command = String(step?.command || '').trim();
+  const commandLike = Boolean(command) || step?.kind === 'command_execution';
   const source = `${step?.kind || ''} ${toolName} ${label} ${command} ${detail} ${step?.output || ''}`.toLowerCase();
-  const fileRefs = extractFileRefs([command, detail, step?.output, fileChangeText(step)].filter(Boolean).join('\n'));
+  const directRefs = extractFileRefs([command, detail, fileChangeText(step)].filter(Boolean).join('\n'));
+  const outputRefs = commandLike ? new Set() : extractFileRefs(step?.output || '');
+  const fileRefs = directRefs.size ? directRefs : outputRefs;
   const count = Math.max(1, fileRefs.size || (Array.isArray(step?.fileChanges) ? step.fileChanges.length : 0));
 
   if (step?.kind === 'file_change' || Array.isArray(step?.fileChanges) && step.fileChanges.length) {
@@ -147,7 +150,7 @@ function describeActivityStep(step) {
 
   const commandKind = classifyCommandIntent(
     command || (step?.kind === 'command_execution' ? detail : ''),
-    Boolean(command) || step?.kind === 'command_execution'
+    commandLike
   );
   if (commandKind) {
     const type =
@@ -162,7 +165,7 @@ function describeActivityStep(step) {
       type,
       label: compactActivityText(label || commandActivityLabel(commandKind)),
       detail: compactActivityText(command || detail),
-      count: type === 'command' ? 1 : count,
+      count: type === 'command' || type === 'search' ? 1 : count,
       unit: type === 'command' ? 'command' : type === 'search' ? 'time' : 'file'
     };
   }
@@ -273,6 +276,10 @@ function dominantActivityType(items) {
 
 function summarizeActivityBatch(items, running) {
   const activeItem = items.length === 1 && running && items[0]?.status === 'running' ? items[0] : null;
+  const singleItem = items.length === 1 ? items[0] : null;
+  if (singleItem) {
+    return activityStepDetailTitle(singleItem);
+  }
   if (activeItem?.type === 'edit') {
     const detail = activeItem.detail || activeItem.label || '';
     return detail ? `正在编辑 ${conciseActivityDetail(detail)}` : '正在编辑文件';
@@ -321,7 +328,7 @@ function summarizeActivityBatch(items, running) {
       return failedOnly ? `编辑失败 ${group.failed} 个文件` : `${active ? '正在编辑' : '已编辑'} ${doneCount || group.count} 个文件`;
     }
     if (key === 'command') {
-      return failedOnly ? `${group.failed} 个本地任务失败` : `${active ? '正在处理' : '已处理'} ${doneCount || group.count} 个本地任务`;
+      return failedOnly ? `${group.failed} 条命令运行失败` : `${active ? '正在运行' : '已运行'} ${doneCount || group.count} 条命令`;
     }
     if (key === 'browser') {
       return failedOnly ? `浏览器操作失败 ${group.failed} 次` : `${active ? '正在操作浏览器' : '已操作浏览器'} ${doneCount || group.count} 次`;
@@ -376,6 +383,33 @@ export function activityBodyItemsForDisplay(visibleItems, overflowItems) {
     visibleBodyItems: Array.isArray(visibleItems) ? visibleItems : [],
     overflowBodyItems: Array.isArray(overflowItems) ? overflowItems : []
   };
+}
+
+export function activityStepDetailTitle(step) {
+  const detail = activityDetailText(step);
+  const target = commandSemanticTarget(step.command || detail, step.type);
+  const failed = step.status === 'failed';
+  const running = step.status === 'running';
+  const suffix = target ? ` ${conciseActivityDetail(target, 110)}` : '';
+
+  if (step.type === 'search' || step.type === 'web_search') {
+    return `${failed ? '搜索失败' : running ? '正在搜索' : '搜索'}${suffix}`;
+  }
+  if (step.type === 'explore') {
+    return `${failed ? '读取失败' : running ? '正在读取' : '读取'}${suffix}`;
+  }
+  if (step.type === 'edit') {
+    return `${failed ? '编辑失败' : running ? '正在编辑' : '已编辑'}${suffix}`;
+  }
+  if (step.type === 'browser') {
+    return `${failed ? '浏览器操作失败' : running ? '正在操作浏览器' : '已操作浏览器'}${suffix}`;
+  }
+  if (step.type === 'tool') {
+    return `${failed ? '操作失败' : running ? '正在完成操作' : '已完成操作'}${suffix}`;
+  }
+
+  const command = step.command || detail;
+  return `${failed ? '运行失败' : running ? '正在运行' : '已运行'} ${conciseActivityDetail(command, 110)}`.trim();
 }
 
 function normalizeActivityDetailText(value, activity) {
@@ -525,6 +559,51 @@ function commandActivityLabel(kind) {
     return '编辑文件';
   }
   return '运行命令';
+}
+
+function unquoteShellToken(value) {
+  return String(value || '').trim().replace(/^['"]|['"]$/g, '');
+}
+
+function commandSemanticTarget(value, type = '') {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '';
+  }
+  if (type === 'search' || /\b(rg|grep|findstr|select-string)\b/i.test(text)) {
+    const quoted = text.match(/(?:rg|grep)\s+(?:-[\w-]+\s+)*["']([^"']+)["']/i);
+    if (quoted?.[1]) {
+      return quoted[1];
+    }
+    const parts = text.split(/\s+/).slice(1).filter((part) => part && !part.startsWith('-'));
+    return unquoteShellToken(parts[0] || text);
+  }
+  if (type === 'explore') {
+    const refs = [...extractFileRefs(text)];
+    if (refs.length) {
+      const lastRef = refs[refs.length - 1];
+      const skillName = skillNameFromPath(lastRef);
+      return skillName ? `${skillName} 技能` : compactActivityPath(lastRef);
+    }
+  }
+  return text;
+}
+
+export function isSkillActivityStep(step) {
+  const values = [step?.command, step?.detail, step?.label].filter(Boolean).join('\n');
+  return Boolean(skillNameFromPath(values)) || /(?:^|\s)读取\s+.+技能(?:\s|$)/.test(String(step?.label || step?.detail || ''));
+}
+
+function skillNameFromPath(value) {
+  const text = String(value || '').replaceAll('\\', '/');
+  const matches = [...text.matchAll(/(?:^|\/)skills\/(?:\.system\/)?([^/\s"'`]+)\/SKILL\.md\b/gi)];
+  const rawName = matches.at(-1)?.[1] || '';
+  if (!rawName) {
+    return '';
+  }
+  return rawName
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
 }
 
 function browserActivityLabel(toolName) {

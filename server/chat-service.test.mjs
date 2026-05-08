@@ -11,6 +11,7 @@ function makeChatService(overrides = {}) {
     getCacheSnapshot: () => ({ config: { skills: [], model: 'gpt-5.5' } }),
     getDesktopBridgeStatus: async () => ({ strict: true, connected: true, mode: 'desktop-proxy', reason: null }),
     listProjectSessions: () => [],
+    readSessionMessages: async () => ({ messages: [] }),
     refreshCodexCache: async () => ({ syncedAt: 'now', projects: [] }),
     renameSession: async () => null,
     broadcast: (payload) => broadcasts.push(payload),
@@ -79,7 +80,7 @@ test('sendChat rejects when strict desktop bridge is unavailable', async () => {
   assert.equal(broadcasts.length, 0);
 });
 
-test('abortChat records and broadcasts an aborted turn even after the backend run is gone', () => {
+test('abortChat records and broadcasts an aborted turn even after the backend run is gone', async () => {
   let abortedIdentifier = null;
   const { service, broadcasts } = makeChatService({
     abortCodexTurn: (identifier) => {
@@ -88,7 +89,7 @@ test('abortChat records and broadcasts an aborted turn even after the backend ru
     }
   });
 
-  const aborted = service.abortChat({
+  const aborted = await service.abortChat({
     sessionId: 'thread-1',
     turnId: 'client-turn-1',
     previousSessionId: 'thread-1'
@@ -158,6 +159,150 @@ test('sendChat sends existing desktop-ipc threads through the desktop follower b
   assert.equal(started.conversationId, 'thread-1');
   assert.equal(started.params.input[0].type, 'text');
   assert.equal(started.params.input[0].text, '从手机发到桌面已有线程');
+});
+
+test('sendChat starts server-side desktop IPC monitoring after desktop handoff', async () => {
+  const { service, broadcasts } = makeChatService({
+    getDesktopBridgeStatus: async () => ({
+      strict: true,
+      connected: true,
+      mode: 'desktop-ipc',
+      reason: null,
+      capabilities: { sendToOpenDesktopThread: true, createThread: false }
+    }),
+    startDesktopFollowerTurn: async () => ({ result: { turn: { id: 'desktop-turn-1' } } }),
+    readSessionMessages: async () => ({ messages: [] })
+  });
+
+  const result = await service.sendChat({
+    projectId: 'project-1',
+    sessionId: 'thread-1',
+    clientTurnId: 'client-turn-1',
+    message: '从手机发到桌面后由后端监控'
+  });
+
+  assert.equal(result.turnId, 'desktop-turn-1');
+  assert.equal(service.getTurn('client-turn-1').status, 'running');
+  assert.equal(service.getTurn('client-turn-1').source, 'desktop-ipc');
+  assert.equal(service.getTurn('desktop-turn-1').status, 'running');
+  assert.deepEqual(service.getActiveDesktopIpcRuns(), [{
+    source: 'desktop-ipc',
+    projectId: 'project-1',
+    sessionId: 'thread-1',
+    previousSessionId: 'thread-1',
+    turnId: 'desktop-turn-1',
+    clientTurnId: 'client-turn-1',
+    startedAt: service.getTurn('desktop-turn-1').startedAt,
+    status: 'running',
+    steerable: false
+  }]);
+  assert.equal(broadcasts.some((payload) => payload.type === 'status-update' && payload.source === 'desktop-ipc'), true);
+});
+
+test('abortChat can abort a server-side desktop IPC monitor run', async () => {
+  const interrupted = [];
+  const { service, broadcasts } = makeChatService({
+    getDesktopBridgeStatus: async () => ({
+      strict: true,
+      connected: true,
+      mode: 'desktop-ipc',
+      reason: null,
+      capabilities: { sendToOpenDesktopThread: true, createThread: false }
+    }),
+    startDesktopFollowerTurn: async () => ({ result: { turn: { id: 'desktop-turn-1' } } }),
+    interruptDesktopFollowerTurn: async (conversationId) => {
+      interrupted.push(conversationId);
+      return { ok: true };
+    },
+    readSessionMessages: async () => ({ messages: [] }),
+    abortCodexTurn: () => false
+  });
+
+  await service.sendChat({
+    projectId: 'project-1',
+    sessionId: 'thread-1',
+    clientTurnId: 'client-turn-1',
+    message: '准备从手机中止桌面监控'
+  });
+
+  const aborted = await service.abortChat({
+    sessionId: 'thread-1',
+    turnId: 'client-turn-1',
+    previousSessionId: 'thread-1'
+  }, { remoteAddress: '127.0.0.1' });
+
+  assert.equal(aborted, true);
+  assert.deepEqual(interrupted, ['thread-1']);
+  assert.equal(service.getActiveDesktopIpcRuns().length, 0);
+  assert.equal(service.getTurn('client-turn-1').status, 'aborted');
+  assert.equal(service.getTurn('desktop-turn-1').status, 'aborted');
+  assert.equal(broadcasts.filter((payload) => payload.type === 'chat-aborted' && payload.source === 'desktop-ipc').length, 1);
+});
+
+test('abortChat falls back to session id when desktop IPC turn id does not match', async () => {
+  const interrupted = [];
+  const { service } = makeChatService({
+    getDesktopBridgeStatus: async () => ({
+      strict: true,
+      connected: true,
+      mode: 'desktop-ipc',
+      reason: null,
+      capabilities: { sendToOpenDesktopThread: true, createThread: false }
+    }),
+    startDesktopFollowerTurn: async () => ({ result: { turn: { id: 'desktop-turn-1' } } }),
+    interruptDesktopFollowerTurn: async (conversationId) => {
+      interrupted.push(conversationId);
+      return { ok: true };
+    },
+    readSessionMessages: async () => ({ messages: [] }),
+    abortCodexTurn: () => false
+  });
+
+  await service.sendChat({
+    projectId: 'project-1',
+    sessionId: 'thread-1',
+    clientTurnId: 'client-turn-1',
+    message: '准备用 session id 兜底中止'
+  });
+
+  const aborted = await service.abortChat({
+    sessionId: 'thread-1',
+    turnId: 'stale-mobile-turn-id'
+  }, { remoteAddress: '127.0.0.1' });
+
+  assert.equal(aborted, true);
+  assert.deepEqual(interrupted, ['thread-1']);
+  assert.equal(service.getActiveDesktopIpcRuns().length, 0);
+  assert.equal(service.getTurn('desktop-turn-1').status, 'aborted');
+});
+
+test('abortChat interrupts a desktop-origin running session by session id', async () => {
+  const interrupted = [];
+  const { service, broadcasts } = makeChatService({
+    getDesktopBridgeStatus: async () => ({
+      strict: true,
+      connected: true,
+      mode: 'desktop-ipc',
+      reason: null,
+      capabilities: { sendToOpenDesktopThread: true, createThread: false }
+    }),
+    interruptDesktopFollowerTurn: async (conversationId) => {
+      interrupted.push(conversationId);
+      return { ok: true };
+    },
+    abortCodexTurn: () => false
+  });
+
+  const aborted = await service.abortChat({
+    projectId: 'project-1',
+    sessionId: 'thread-1'
+  }, { remoteAddress: '127.0.0.1' });
+
+  assert.equal(aborted, true);
+  assert.deepEqual(interrupted, ['thread-1']);
+  assert.equal(broadcasts.at(-1).type, 'chat-aborted');
+  assert.equal(broadcasts.at(-1).source, 'desktop-thread');
+  assert.equal(broadcasts.at(-1).sessionId, 'thread-1');
 });
 
 test('sendChat sends desktop-ipc plan requests with desktop collaboration mode', async () => {

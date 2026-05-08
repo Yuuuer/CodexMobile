@@ -2,7 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { appReducer, createInitialUiState } from './app/AppState.js';
 import { applyPwaTheme } from './app/pwa-theme.js';
-import { createDraftSession, resolveNewConversationProject, sessionRunBadgeState, shouldPreserveLocalRunsFromStatus, titleFromFirstMessage } from './app/session-utils.js';
+import {
+  createDraftSession,
+  payloadRunKeys,
+  resolveNewConversationProject,
+  runningByIdWithSelectedActivity,
+  selectedSessionIsRunning,
+  sessionRunBadgeState,
+  shouldDropRunningActivityWhenNoActiveRuns,
+  shouldPreserveLocalRunsFromStatus,
+  titleFromFirstMessage
+} from './app/session-utils.js';
 import { runtimeKeysForPayload } from './app/useTurnRuntime.js';
 import { viewportSizingMetrics } from './app/useViewportSizing.js';
 
@@ -43,18 +53,76 @@ test('applyPwaTheme syncs iOS PWA meta with dark theme', () => {
   assert.equal(elements.get('meta[data-app-status-bar-style]').content, 'black-translucent');
 });
 
-test('status sync preserves local desktop-ipc pending runs', () => {
+test('status sync preserves local turn polling and refresh timers only', () => {
   assert.equal(
-    shouldPreserveLocalRunsFromStatus({ desktopIpcPendingRunCount: 1 }),
+    shouldPreserveLocalRunsFromStatus({ activePollCount: 1 }),
+    true
+  );
+  assert.equal(
+    shouldPreserveLocalRunsFromStatus({ turnRefreshTimerCount: 1 }),
     true
   );
   assert.equal(
     shouldPreserveLocalRunsFromStatus({
       activePollCount: 0,
-      turnRefreshTimerCount: 0,
-      desktopIpcPendingRunCount: 0
+      turnRefreshTimerCount: 0
     }),
     false
+  );
+});
+
+test('empty activeRuns status keeps desktop thread running activity', () => {
+  assert.equal(shouldDropRunningActivityWhenNoActiveRuns({
+    role: 'activity',
+    kind: 'desktop',
+    status: 'running'
+  }), false);
+  assert.equal(shouldDropRunningActivityWhenNoActiveRuns({
+    role: 'activity',
+    kind: 'turn',
+    status: 'running'
+  }), true);
+});
+
+test('selected desktop activity counts as running for composer controls', () => {
+  assert.equal(selectedSessionIsRunning({
+    running: false,
+    hasRunningActivity: true
+  }), true);
+  assert.equal(selectedSessionIsRunning({
+    running: false,
+    hasRunningActivity: false
+  }), false);
+});
+
+test('selected running activity marks the matching sidebar session as running', () => {
+  const runningById = runningByIdWithSelectedActivity(
+    {},
+    { id: 'thread-1', turnId: 'turn-1' },
+    true
+  );
+
+  assert.equal(runningById['thread-1'], true);
+  assert.equal(runningById['turn-1'], true);
+  assert.equal(
+    sessionRunBadgeState(
+      { id: 'thread-1', turnId: 'turn-1' },
+      { runningById }
+    ),
+    'running'
+  );
+});
+
+test('desktop ipc active runs expose both app and client turn ids', () => {
+  assert.deepEqual(
+    payloadRunKeys({
+      source: 'desktop-ipc',
+      turnId: 'desktop-turn-1',
+      clientTurnId: 'client-turn-1',
+      sessionId: 'thread-1',
+      previousSessionId: 'thread-1'
+    }),
+    ['desktop-turn-1', 'client-turn-1', 'thread-1', 'thread-1']
   );
 });
 
