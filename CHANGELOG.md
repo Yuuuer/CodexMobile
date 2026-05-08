@@ -2,6 +2,12 @@
 
 All notable changes to CodexMobile are tracked here.
 
+## Unreleased
+
+### Changed
+
+- Replaced the README screenshots with redacted dark/light demos that show the sidebar, running state, and desktop-style tool activity flow.
+
 ## [1.0.0] - 2026-05-09
 
 ### Added

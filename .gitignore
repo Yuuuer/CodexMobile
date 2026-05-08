@@ -18,7 +18,7 @@ output/
 NUL
 Microsoft/
 codexmobile-*.png
-!docs/images/codexmobile-ui-*.png
+!docs/images/codexmobile-demo-*.png
 *.log
 npm-debug.log*
 yarn-debug.log*

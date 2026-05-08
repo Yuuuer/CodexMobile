@@ -27,9 +27,15 @@ CodexMobile 1.0 是我给自己做的 Codex 移动工作台：电脑继续作为
 
 ## 界面演示
 
-| 深色模式 | 浅色模式 |
+截图使用安全演示内容，已替换真实项目名、历史对话、文件路径和运行日志。
+
+| 深色对话与工具过程 | 深色侧边栏状态 |
 | --- | --- |
-| <img src="docs/images/codexmobile-ui-dark.png" width="260" alt="CodexMobile 深色模式新对话界面" /> | <img src="docs/images/codexmobile-ui-light.png" width="260" alt="CodexMobile 浅色模式新对话界面" /> |
+| <img src="docs/images/codexmobile-demo-chat-dark.png" width="260" alt="CodexMobile 深色模式对话和工具执行过程" /> | <img src="docs/images/codexmobile-demo-sidebar-dark.png" width="260" alt="CodexMobile 深色模式侧边栏运行状态" /> |
+
+| 浅色对话与工具过程 | 浅色侧边栏状态 |
+| --- | --- |
+| <img src="docs/images/codexmobile-demo-chat-light.png" width="260" alt="CodexMobile 浅色模式对话和工具执行过程" /> | <img src="docs/images/codexmobile-demo-sidebar-light.png" width="260" alt="CodexMobile 浅色模式侧边栏运行状态" /> |
 
 ## 核心能力
 
