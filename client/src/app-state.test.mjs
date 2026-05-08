@@ -82,6 +82,12 @@ test('empty activeRuns status keeps desktop thread running activity', () => {
     kind: 'turn',
     status: 'running'
   }), true);
+  assert.equal(shouldDropRunningActivityWhenNoActiveRuns({
+    role: 'activity',
+    kind: 'turn',
+    status: 'running',
+    transient: true
+  }), false);
 });
 
 test('selected desktop activity counts as running for composer controls', () => {

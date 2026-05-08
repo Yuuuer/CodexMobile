@@ -1,0 +1,99 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  shouldRefreshDesktopThreadForPayload,
+  shouldRenderActivityMessageForPayload,
+  shouldRenderAssistantMessageForPayload,
+  shouldRenderStatusMessageForPayload
+} from './app/useAppWebSocket.js';
+
+test('desktop IPC status updates drive runtime without rendering local activity cards', () => {
+  assert.equal(
+    shouldRenderStatusMessageForPayload({
+      type: 'status-update',
+      source: 'desktop-ipc',
+      kind: 'turn',
+      status: 'running'
+    }),
+    false
+  );
+  assert.equal(
+    shouldRenderStatusMessageForPayload({
+      type: 'status-update',
+      source: 'desktop-ipc',
+      kind: 'turn',
+      status: 'completed'
+    }),
+    false
+  );
+  assert.equal(
+    shouldRenderStatusMessageForPayload({
+      type: 'status-update',
+      source: 'headless-local',
+      kind: 'turn',
+      status: 'running'
+    }),
+    false
+  );
+  assert.equal(
+    shouldRenderStatusMessageForPayload({
+      type: 'status-update',
+      source: 'headless-local',
+      kind: 'reasoning',
+      status: 'running'
+    }),
+    false
+  );
+});
+
+test('external thread terminal events refresh the thread instead of completing local cards', () => {
+  assert.equal(
+    shouldRefreshDesktopThreadForPayload({
+      type: 'chat-complete',
+      source: 'desktop-ipc'
+    }),
+    true
+  );
+  assert.equal(
+    shouldRefreshDesktopThreadForPayload({
+      type: 'status-update',
+      source: 'desktop-ipc',
+      kind: 'turn',
+      status: 'completed'
+    }),
+    true
+  );
+  assert.equal(
+    shouldRefreshDesktopThreadForPayload({
+      type: 'chat-complete',
+      source: 'headless-local'
+    }),
+    true
+  );
+});
+
+test('headless fallback activity and assistant updates are read from the thread like IPC', () => {
+  assert.equal(
+    shouldRenderActivityMessageForPayload({
+      type: 'activity-update',
+      source: 'headless-local',
+      status: 'running'
+    }),
+    false
+  );
+  assert.equal(
+    shouldRenderAssistantMessageForPayload({
+      type: 'assistant-update',
+      source: 'headless-local',
+      content: '完成'
+    }),
+    false
+  );
+  assert.equal(
+    shouldRenderActivityMessageForPayload({
+      type: 'activity-update',
+      status: 'running'
+    }),
+    true
+  );
+});

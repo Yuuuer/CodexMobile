@@ -200,6 +200,25 @@ function rawAgentActivityFromMessage(payload, turns, sequence) {
   };
 }
 
+function rawContextCompactionActivityFromEntry({ timestamp, turns, sequence }) {
+  const turnId = turnIdForRawActivityTimestamp(turns, timestamp);
+  if (!turnId) {
+    return null;
+  }
+  return {
+    turnId,
+    activity: {
+      id: `${turnId}-raw-context-compaction-${sequence}`,
+      kind: 'context_compaction',
+      label: '上下文已自动压缩',
+      status: 'completed',
+      detail: '',
+      timestamp,
+      sequence
+    }
+  };
+}
+
 function rawPlanActivityFromCall({ payload, outputRecord, turns, sequence }) {
   const timestamp = payload.timestamp || outputRecord?.timestamp || new Date().toISOString();
   const turnId = turnIdForRawActivityTimestamp(turns, timestamp);
@@ -356,6 +375,7 @@ export function rawSessionActivitiesFromJsonl(content, turns = []) {
   const calls = [];
   const customCalls = [];
   const messages = [];
+  const compactions = [];
   const outputs = new Map();
   const lines = String(content || '').split(/\r?\n/);
   let sequence = 0;
@@ -367,6 +387,13 @@ export function rawSessionActivitiesFromJsonl(content, turns = []) {
     try {
       entry = JSON.parse(line);
     } catch {
+      continue;
+    }
+    if (entry?.type === 'compacted') {
+      compactions.push({
+        timestamp: entry.timestamp || new Date().toISOString(),
+        sequence: sequence++
+      });
       continue;
     }
     if (entry?.type !== 'response_item') {
@@ -406,6 +433,12 @@ export function rawSessionActivitiesFromJsonl(content, turns = []) {
   const rawActivities = [];
   for (const payload of messages) {
     const item = rawAgentActivityFromMessage(payload, turns, payload.sequence);
+    if (item) {
+      rawActivities.push(item);
+    }
+  }
+  for (const payload of compactions) {
+    const item = rawContextCompactionActivityFromEntry({ ...payload, turns });
     if (item) {
       rawActivities.push(item);
     }

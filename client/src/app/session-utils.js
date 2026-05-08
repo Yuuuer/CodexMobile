@@ -362,6 +362,9 @@ export function shouldDropRunningActivityWhenNoActiveRuns(message) {
   if (!['running', 'queued'].includes(String(message?.status || ''))) {
     return false;
   }
+  if (message?.transient) {
+    return false;
+  }
   return String(message?.kind || '') !== 'desktop';
 }
 

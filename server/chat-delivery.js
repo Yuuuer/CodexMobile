@@ -159,6 +159,7 @@ export async function sendViaDesktopIpc({
   const appTurnId = result?.result?.turn?.id || result?.turn?.id || turnId;
   broadcast({
     type: 'status-update',
+    source: bridge?.mode || 'desktop-ipc',
     projectId: project.id,
     sessionId: selectedSessionId,
     turnId,
@@ -192,38 +193,45 @@ export function runQueuedHeadlessChatJob({
   broadcast,
   rememberConversationAlias,
   rememberTurn,
+  rememberLiveSession,
   emitJobEvent,
   scheduleAutoNameCompletedSession,
   onQueueDrained
 }) {
   const metadataUpdates = [];
 
-  function rememberCreatedProjectlessThread(payload) {
-    if (!job.project?.projectless || !payload?.sessionId || !job.draftSessionId) {
+  function rememberStartedBackgroundThread(payload) {
+    if (!payload?.sessionId || !job.draftSessionId) {
       return;
     }
     const updatedAt = payload.startedAt || new Date().toISOString();
+    const sessionRecord = {
+      id: payload.sessionId,
+      projectId: job.project.id,
+      projectPath: job.executionProjectPath || job.project.path,
+      projectless: Boolean(job.project?.projectless),
+      title: job.displayMessage,
+      summary: job.displayMessage,
+      updatedAt,
+      filePath: payload.filePath || payload.path || null,
+      messages: [
+        {
+          id: `${payload.sessionId}-user-${job.turnId}`,
+          role: 'user',
+          content: job.displayMessage,
+          timestamp: updatedAt
+        }
+      ]
+    };
+    rememberLiveSession?.(sessionRecord);
     metadataUpdates.push(
       Promise.all([
-        registerProjectlessThread(payload.sessionId, job.project.path),
-        registerMobileSession({
-          id: payload.sessionId,
-          projectPath: job.executionProjectPath || job.project.path,
-          projectless: true,
-          title: job.displayMessage,
-          summary: job.displayMessage,
-          updatedAt,
-          messages: [
-            {
-              id: `${payload.sessionId}-user-${job.turnId}`,
-              role: 'user',
-              content: job.displayMessage,
-              timestamp: updatedAt
-            }
-          ]
-        })
+        job.project?.projectless
+          ? registerProjectlessThread(payload.sessionId, job.project.path)
+          : Promise.resolve(null),
+        registerMobileSession(sessionRecord)
       ]).catch((error) => {
-        console.warn('[sessions] Failed to register projectless thread:', error.message);
+        console.warn('[sessions] Failed to register background thread:', error.message);
       })
     );
   }
@@ -243,17 +251,23 @@ export function runQueuedHeadlessChatJob({
       turnId: job.turnId
     },
     (payload) => {
-      if (payload.sessionId) {
-        state.sessionId = payload.sessionId;
-        rememberConversationAlias(queueKey, payload.sessionId);
+      const eventPayload = {
+        ...payload,
+        source: payload?.source || 'headless-local'
+      };
+      if (eventPayload.sessionId) {
+        state.sessionId = eventPayload.sessionId;
+        rememberConversationAlias(queueKey, eventPayload.sessionId);
       }
-      if (payload.previousSessionId) {
-        rememberConversationAlias(queueKey, payload.previousSessionId);
+      if (eventPayload.previousSessionId) {
+        rememberConversationAlias(queueKey, eventPayload.previousSessionId);
       }
-      if (payload.type === 'thread-started') {
-        rememberCreatedProjectlessThread(payload);
+      if (eventPayload.type === 'thread-started') {
+        rememberStartedBackgroundThread(eventPayload);
+      } else if (eventPayload.type === 'chat-started') {
+        rememberStartedBackgroundThread(eventPayload);
       }
-      emitJobEvent(job, payload);
+      emitJobEvent(job, eventPayload);
     }
   ).then(async (finalSessionId) => {
     if (finalSessionId) {

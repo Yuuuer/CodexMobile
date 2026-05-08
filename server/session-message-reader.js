@@ -27,6 +27,107 @@ function positiveNumber(value) {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
+function epochSecondsFromIso(value) {
+  const ms = Date.parse(value || '');
+  return Number.isFinite(ms) ? ms / 1000 : null;
+}
+
+function responseMessageText(content) {
+  if (typeof content === 'string') {
+    return content.trim();
+  }
+  if (!Array.isArray(content)) {
+    return '';
+  }
+  return content
+    .map((item) => item?.text || item?.content || '')
+    .filter(Boolean)
+    .join('')
+    .trim();
+}
+
+function ensureRolloutTurn(turns, sessionId, timestamp) {
+  if (turns.length) {
+    return turns.at(-1);
+  }
+  const turn = {
+    id: `${sessionId}-turn-1`,
+    startedAt: epochSecondsFromIso(timestamp)
+  };
+  turns.push(turn);
+  return turn;
+}
+
+export function messagesFromRolloutJsonl(content, sessionId) {
+  const messages = [];
+  const turns = [];
+  const lines = String(content || '').split(/\r?\n/);
+
+  for (const line of lines) {
+    if (!line.trim()) {
+      continue;
+    }
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const timestamp = entry.timestamp || new Date().toISOString();
+    if (entry.type === 'turn_context') {
+      turns.push({
+        id: entry.payload?.turn_id || `${sessionId}-turn-${turns.length + 1}`,
+        startedAt: epochSecondsFromIso(timestamp)
+      });
+      continue;
+    }
+    if (entry.type !== 'response_item' || entry.payload?.type !== 'message') {
+      continue;
+    }
+    const role = entry.payload.role;
+    if (role !== 'user' && role !== 'assistant') {
+      continue;
+    }
+    if (role === 'assistant' && entry.payload.phase === 'commentary') {
+      continue;
+    }
+    const contentText = responseMessageText(entry.payload.content);
+    if (!contentText) {
+      continue;
+    }
+    const turn = ensureRolloutTurn(turns, sessionId, timestamp);
+    messages.push({
+      id: entry.payload.id || `${turn.id}-${role}-${messages.length + 1}`,
+      role,
+      content: contentText,
+      timestamp,
+      turnId: turn.id,
+      sessionId
+    });
+  }
+
+  return { messages, turns };
+}
+
+async function readRolloutThreadFromFile(filePath, sessionId) {
+  if (!filePath) {
+    return null;
+  }
+  const content = await fs.readFile(filePath, 'utf8');
+  const parsed = messagesFromRolloutJsonl(content, sessionId);
+  return {
+    id: sessionId,
+    path: filePath,
+    turns: parsed.turns,
+    messages: parsed.messages
+  };
+}
+
+function canFallbackToRollout(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.statusCode === 404 || message.includes('thread not loaded') || message.includes('desktop thread not found');
+}
+
 export function publicContextState(state = {}, configContext = {}) {
   const contextWindow = state.contextWindow || configContext.modelContextWindow || null;
   const inputTokens = state.inputTokens || null;
@@ -206,28 +307,49 @@ export function createSessionMessageReader({
   sortDesktopActivitySteps = defaultSortDesktopActivitySteps,
   filterDeletedMessages = defaultFilterDeletedMessages,
   readRolloutContextState: readRolloutContextStateImpl = readRolloutContextState,
+  resolveSessionThread = async () => null,
   getConfigContext = () => ({})
 } = {}) {
+  async function readThread(sessionId) {
+    try {
+      const response = await readDesktopThread(sessionId, { includeTurns: true });
+      if (response?.thread) {
+        return response.thread;
+      }
+    } catch (error) {
+      if (!canFallbackToRollout(error)) {
+        throw error;
+      }
+    }
+
+    const session = await resolveSessionThread(sessionId);
+    const filePath = session?.filePath || session?.path || '';
+    const thread = await readRolloutThreadFromFile(filePath, sessionId).catch(() => null);
+    if (thread) {
+      return thread;
+    }
+    const error = new Error('Desktop thread not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
   async function readSessionMessages(
     sessionId,
     { limit = 120, offset = null, latest = true, includeActivity = false } = {}
   ) {
     const deletedIds = await readDeletedMessageIds(sessionId);
-    const response = await readDesktopThread(sessionId, { includeTurns: true });
-    if (!response?.thread) {
-      const error = new Error('Desktop thread not found');
-      error.statusCode = 404;
-      throw error;
-    }
+    const thread = await readThread(sessionId);
 
-    const messages = messagesFromDesktopThread(response.thread, { includeActivity });
+    const messages = Array.isArray(thread.messages)
+      ? thread.messages.map((message) => ({ ...message }))
+      : messagesFromDesktopThread(thread, { includeActivity });
     if (includeActivity) {
-      const rawActivities = await readRawSessionActivities(response.thread.path, response.thread.turns || []);
+      const rawActivities = await readRawSessionActivities(thread.path, thread.turns || []);
       removeFallbackActivitiesCoveredByRaw(messages, rawActivities);
       for (const item of rawActivities) {
         upsertDesktopActivity(messages, item.turnId, item.activity);
       }
-      const collabActivities = await readDesktopCollabActivities(response.thread.path);
+      const collabActivities = await readDesktopCollabActivities(thread.path);
       for (const item of collabActivities) {
         upsertDesktopActivity(messages, item.turnId, item.activity);
       }
@@ -235,7 +357,7 @@ export function createSessionMessageReader({
     }
     messages.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
 
-    const contextState = await readRolloutContextStateImpl(response.thread.path, sessionId);
+    const contextState = await readRolloutContextStateImpl(thread.path, sessionId);
     return {
       ...paginateMessages(filterDeletedMessages(messages, deletedIds), { limit, offset, latest }),
       context: publicContextState(contextState, getConfigContext() || {})
@@ -244,4 +366,3 @@ export function createSessionMessageReader({
 
   return { readSessionMessages };
 }
-

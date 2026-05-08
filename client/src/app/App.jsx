@@ -19,6 +19,7 @@ import { useTurnSubmission } from './useTurnSubmission.js';
 import { useTurnRuntime } from './useTurnRuntime.js';
 import { useViewportSizing } from './useViewportSizing.js';
 import { applyPwaTheme } from './pwa-theme.js';
+import { rememberSelectedSession } from './selection-persistence.js';
 import {
   buildComposerRunStatus,
   emptyContextStatus,
@@ -189,6 +190,14 @@ export default function App() {
   useEffect(() => {
     selectedSessionRef.current = selectedSession;
   }, [selectedSession]);
+
+  useEffect(() => {
+    rememberSelectedSession(
+      selectedSession?.projectId || selectedProject?.id
+        ? { ...selectedSession, projectId: selectedSession?.projectId || selectedProject?.id }
+        : selectedSession
+    );
+  }, [selectedProject?.id, selectedSession?.draft, selectedSession?.id, selectedSession?.projectId]);
 
   useEffect(() => {
     messagesRef.current = messages;

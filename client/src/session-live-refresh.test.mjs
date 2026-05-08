@@ -29,6 +29,25 @@ test('shouldPollSelectedSessionMessages allows desktop-ipc running sessions to r
   );
 });
 
+test('shouldPollSelectedSessionMessages allows headless fallback sessions to refresh like external threads', () => {
+  assert.equal(
+    shouldPollSelectedSessionMessages({
+      hasSelectedRunning: true,
+      desktopBridge: { connected: true, mode: 'desktop-ipc' },
+      hasExternalThreadRefresh: true
+    }),
+    true
+  );
+  assert.equal(
+    shouldPollSelectedSessionMessages({
+      hasSelectedRunning: true,
+      desktopBridge: { connected: true, mode: 'headless-local' },
+      hasExternalThreadRefresh: true
+    }),
+    true
+  );
+});
+
 test('shouldPollSelectedSessionMessages protects local streaming runs when desktop-ipc is only a global bridge', () => {
   assert.equal(
     shouldPollSelectedSessionMessages({
@@ -69,6 +88,37 @@ test('mergeLiveSelectedThreadMessages switches to desktop messages once the desk
   const merged = mergeLiveSelectedThreadMessages(current, loaded);
 
   assert.deepEqual(merged.map((message) => message.id), ['old-user', 'desktop-user', 'desktop-activity']);
+});
+
+test('mergeLiveSelectedThreadMessages keeps transient handoff running until real output catches up', () => {
+  const current = [
+    { id: 'local-1', role: 'user', content: '手机新建线程', timestamp: '2026-05-07T06:01:00.000Z', turnId: 'turn-1' },
+    {
+      id: 'status-turn-1',
+      role: 'activity',
+      status: 'running',
+      transient: true,
+      label: '后台启动中',
+      content: '后台启动中',
+      timestamp: '2026-05-07T06:01:00.000Z',
+      turnId: 'turn-1',
+      activities: [{ id: 'handoff', kind: 'turn', label: '后台启动中', status: 'running' }]
+    }
+  ];
+
+  const loadedUserOnly = [
+    { id: 'desktop-user', role: 'user', content: '手机新建线程', timestamp: '2026-05-07T06:01:00.000Z', turnId: 'turn-1' }
+  ];
+  const withUserOnly = mergeLiveSelectedThreadMessages(current, loadedUserOnly);
+  assert.deepEqual(withUserOnly.map((message) => message.id), ['desktop-user', 'status-turn-1']);
+  assert.equal(withUserOnly[1].status, 'running');
+
+  const loadedWithAssistant = [
+    { id: 'desktop-user', role: 'user', content: '手机新建线程', timestamp: '2026-05-07T06:01:00.000Z', turnId: 'turn-1' },
+    { id: 'desktop-assistant', role: 'assistant', content: '已经好了', timestamp: '2026-05-07T06:01:04.000Z', turnId: 'turn-1' }
+  ];
+  const withAssistant = mergeLiveSelectedThreadMessages(current, loadedWithAssistant);
+  assert.deepEqual(withAssistant.map((message) => message.id), ['desktop-user', 'desktop-assistant']);
 });
 
 test('mergeLiveSelectedThreadMessages treats image-preview optimistic sends as the same user message', () => {
@@ -253,6 +303,123 @@ test('syncDesktopActivityRuntimeFromMessages marks completion after selected des
       timestamp: '2026-05-08T07:02:00.000Z'
     }]
   ]);
+});
+
+test('syncDesktopActivityRuntimeFromMessages treats desktop-ipc runtime as desktop thread state', () => {
+  const calls = [];
+  assert.equal(
+    syncDesktopActivityRuntimeFromMessages({
+      messages: [
+        {
+          role: 'activity',
+          kind: 'desktop',
+          status: 'completed',
+          sessionId: 'thread-1',
+          turnId: 'desktop-turn-1',
+          completedAt: '2026-05-08T07:03:00.000Z',
+          timestamp: '2026-05-08T07:03:00.000Z'
+        }
+      ],
+      sessionId: 'thread-1',
+      selectedRunRuntime: {
+        status: 'running',
+        source: 'desktop-ipc',
+        turnId: 'desktop-turn-1'
+      },
+      clearRun: (payload) => calls.push(['clear', payload]),
+      markSessionCompleteNotice: (payload) => calls.push(['complete', payload])
+    }),
+    'completed'
+  );
+
+  assert.equal(calls[0][0], 'clear');
+  assert.equal(calls[1][0], 'complete');
+  assert.equal(calls[1][1].source, 'desktop-ipc');
+});
+
+test('syncDesktopActivityRuntimeFromMessages clears desktop-ipc runtime when thread no longer has running activity', () => {
+  const calls = [];
+  assert.equal(
+    syncDesktopActivityRuntimeFromMessages({
+      messages: [
+        { role: 'user', sessionId: 'thread-1', turnId: 'desktop-turn-1', content: '手机发起' },
+        { role: 'assistant', sessionId: 'thread-1', turnId: 'desktop-turn-1', content: '完成' }
+      ],
+      sessionId: 'thread-1',
+      selectedRunRuntime: {
+        status: 'running',
+        source: 'desktop-ipc',
+        turnId: 'desktop-turn-1'
+      },
+      clearRun: (payload) => calls.push(['clear', payload])
+    }),
+    'cleared'
+  );
+
+  assert.deepEqual(calls, [['clear', {
+    source: 'desktop-ipc',
+    sessionId: 'thread-1',
+    turnId: 'desktop-turn-1'
+  }]]);
+});
+
+test('syncDesktopActivityRuntimeFromMessages preserves headless source while marking running thread activity', () => {
+  const calls = [];
+  assert.equal(
+    syncDesktopActivityRuntimeFromMessages({
+      messages: [
+        {
+          role: 'activity',
+          kind: 'desktop',
+          status: 'running',
+          sessionId: 'thread-1',
+          turnId: 'headless-turn-1',
+          startedAt: '2026-05-08T07:03:00.000Z'
+        }
+      ],
+      sessionId: 'thread-1',
+      selectedRunRuntime: {
+        status: 'running',
+        source: 'headless-local',
+        turnId: 'headless-turn-1'
+      },
+      markRun: (payload) => calls.push(['mark', payload])
+    }),
+    'marked'
+  );
+
+  assert.equal(calls[0][1].source, 'headless-local');
+});
+
+test('syncDesktopActivityRuntimeFromMessages treats headless-local runtime as external thread state', () => {
+  const calls = [];
+  assert.equal(
+    syncDesktopActivityRuntimeFromMessages({
+      messages: [
+        {
+          role: 'activity',
+          kind: 'desktop',
+          status: 'completed',
+          sessionId: 'thread-1',
+          turnId: 'headless-turn-1',
+          completedAt: '2026-05-08T07:04:00.000Z',
+          timestamp: '2026-05-08T07:04:00.000Z'
+        }
+      ],
+      sessionId: 'thread-1',
+      selectedRunRuntime: {
+        status: 'running',
+        source: 'headless-local',
+        turnId: 'headless-turn-1'
+      },
+      clearRun: (payload) => calls.push(['clear', payload]),
+      markSessionCompleteNotice: (payload) => calls.push(['complete', payload])
+    }),
+    'completed'
+  );
+
+  assert.equal(calls[0][1].source, 'headless-local');
+  assert.equal(calls[1][1].source, 'headless-local');
 });
 
 test('applySessionRenameToProjectSessions patches the loaded sidebar session in place', () => {

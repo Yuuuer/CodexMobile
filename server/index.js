@@ -22,6 +22,7 @@ import {
   listProjectSessions,
   listProjects,
   readSessionMessages,
+  rememberLiveSession,
   refreshCodexCache,
   renameSession
 } from './codex-data.js';
@@ -182,7 +183,8 @@ const chatService = createChatService({
   runImageTurn,
   isImageRequest,
   useLegacyImageGenerator,
-  maybeAutoNameSession
+  maybeAutoNameSession,
+  rememberLiveSession
 });
 const handleNotificationApi = createNotificationRouteHandler({
   pushService,

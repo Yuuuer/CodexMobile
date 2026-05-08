@@ -24,6 +24,9 @@ function makeChatService(overrides = {}) {
     isImageRequest: () => false,
     useLegacyImageGenerator: () => false,
     maybeAutoNameSession: async () => false,
+    registerProjectlessThread: async () => null,
+    registerMobileSession: async () => null,
+    rememberLiveSession: () => null,
     ...overrides
   });
   return { service, broadcasts };
@@ -496,6 +499,56 @@ test('sendChat registers new projectless background threads for mobile and deskt
   assert.equal(mobileRegistration.summary, '你好呀');
 });
 
+test('sendChat remembers a started background thread path before broadcasting it', async () => {
+  const events = [];
+  const { service } = makeChatService({
+    broadcast: (payload) => events.push(`broadcast:${payload.type}`),
+    rememberLiveSession: (session) => events.push(`remember:${session.id}:${session.filePath}`),
+    getDesktopBridgeStatus: async () => ({
+      strict: true,
+      connected: true,
+      mode: 'desktop-ipc',
+      reason: null,
+      capabilities: {
+        sendToOpenDesktopThread: true,
+        createThread: false,
+        createThreadViaBackground: true,
+        backgroundCodex: true
+      }
+    }),
+    runCodexTurn: async (payload, emit) => {
+      emit({
+        type: 'thread-started',
+        sessionId: 'background-thread-1',
+        previousSessionId: payload.draftSessionId,
+        turnId: payload.turnId,
+        filePath: '/tmp/background-rollout.jsonl',
+        startedAt: '2026-05-07T08:00:00.000Z'
+      });
+      emit({
+        type: 'chat-complete',
+        sessionId: 'background-thread-1',
+        previousSessionId: payload.draftSessionId,
+        turnId: payload.turnId
+      });
+      return 'background-thread-1';
+    }
+  });
+
+  await service.sendChat({
+    projectId: 'project-1',
+    draftSessionId: 'draft-project-1',
+    clientTurnId: 'client-turn',
+    message: '后台新线程'
+  });
+  await flushQueuedWork();
+
+  const rememberedIndex = events.findIndex((event) => event === 'remember:background-thread-1:/tmp/background-rollout.jsonl');
+  const broadcastIndex = events.findIndex((event) => event === 'broadcast:thread-started');
+  assert.ok(rememberedIndex >= 0);
+  assert.ok(broadcastIndex > rememberedIndex);
+});
+
 test('sendChat starts a headless local Codex turn when desktop bridge is in headless mode', async () => {
   let runPayload = null;
   const { service, broadcasts } = makeChatService({
@@ -527,6 +580,8 @@ test('sendChat starts a headless local Codex turn when desktop bridge is in head
   assert.equal(runPayload.draftSessionId, 'draft-project-1-1');
   assert.match(runPayload.message, /桌面端没开也跑一下/);
   assert.equal(broadcasts.some((payload) => payload.type === 'user-message'), true);
+  assert.equal(broadcasts.find((payload) => payload.type === 'thread-started')?.source, 'headless-local');
+  assert.equal(broadcasts.find((payload) => payload.type === 'chat-complete')?.source, 'headless-local');
 });
 
 test('sendChat passes plan collaboration mode to headless local Codex turns', async () => {

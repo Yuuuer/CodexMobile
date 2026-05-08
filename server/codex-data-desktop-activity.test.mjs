@@ -228,3 +228,75 @@ test('rawSessionActivitiesFromJsonl preserves commentary and tool order', () => 
     ['先看状态。', '本地任务已处理', '再看页面。', '已完成一步操作']
   );
 });
+
+test('rawSessionActivitiesFromJsonl keeps context compaction at its JSONL position', () => {
+  const turnWindow = [
+    {
+      id: 'turn-1',
+      startedAt: Date.parse('2026-02-02T00:00:00.000Z') / 1000,
+      completedAt: Date.parse('2026-02-02T00:00:10.000Z') / 1000
+    }
+  ];
+  const content = [
+    {
+      timestamp: '2026-02-02T00:00:01.000Z',
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        role: 'assistant',
+        phase: 'commentary',
+        content: [{ type: 'output_text', text: '先读取现状。' }]
+      }
+    },
+    {
+      timestamp: '2026-02-02T00:00:02.000Z',
+      type: 'response_item',
+      payload: {
+        type: 'function_call',
+        name: 'exec_command',
+        call_id: 'call-1',
+        arguments: JSON.stringify({ cmd: 'rg foo client/src' })
+      }
+    },
+    {
+      timestamp: '2026-02-02T00:00:02.500Z',
+      type: 'response_item',
+      payload: {
+        type: 'function_call_output',
+        call_id: 'call-1',
+        output: 'Process exited with code 0\nOutput:\nclient/src/App.jsx:foo'
+      }
+    },
+    {
+      timestamp: '2026-02-02T00:00:03.000Z',
+      type: 'compacted',
+      payload: {}
+    },
+    {
+      timestamp: '2026-02-02T00:00:03.001Z',
+      type: 'turn_context',
+      payload: { turn_id: 'turn-1' }
+    },
+    {
+      timestamp: '2026-02-02T00:00:04.000Z',
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        role: 'assistant',
+        phase: 'commentary',
+        content: [{ type: 'output_text', text: '再继续验证。' }]
+      }
+    }
+  ].map((entry) => JSON.stringify(entry)).join('\n');
+
+  const activities = rawSessionActivitiesFromJsonl(content, turnWindow);
+
+  assert.deepEqual(
+    activities.map((item) => item.activity.kind),
+    ['agent_message', 'command_execution', 'context_compaction', 'agent_message']
+  );
+  assert.deepEqual(
+    activities.map((item) => item.activity.label),
+    ['先读取现状。', '本地任务已处理', '上下文已自动压缩', '再继续验证。']
+  );
+});

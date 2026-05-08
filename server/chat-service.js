@@ -45,7 +45,8 @@ export function createChatService({
   useLegacyImageGenerator,
   maybeAutoNameSession,
   registerProjectlessThread = registerProjectlessThreadInCodexState,
-  registerMobileSession = registerMobileSessionInIndex
+  registerMobileSession = registerMobileSessionInIndex,
+  rememberLiveSession = () => null
 }) {
   const chatQueue = createChatQueue();
   const getConversationQueue = chatQueue.getConversationQueue;
@@ -174,6 +175,7 @@ export function createChatService({
       broadcast,
       rememberConversationAlias,
       rememberTurn,
+      rememberLiveSession,
       emitJobEvent,
       scheduleAutoNameCompletedSession,
       onQueueDrained: () => setTimeout(() => runNextQueuedChat(queueKey), 0)

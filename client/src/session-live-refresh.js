@@ -20,6 +20,22 @@ function isRunningStatus(value) {
   return ['running', 'queued'].includes(String(value || ''));
 }
 
+function isTransientActivityMessage(message) {
+  return message?.role === 'activity' && Boolean(message?.transient);
+}
+
+function loadedHasAssistantForActivity(loaded, activity) {
+  const keys = new Set(messageRunKeys(activity));
+  if (!keys.size) {
+    return false;
+  }
+  return loaded.some((item) => item?.role === 'assistant' && messageMatchesRunKeys(item, keys) && normalizeText(item.content));
+}
+
+function isDesktopRuntimeSource(value) {
+  return value === 'desktop-thread' || value === 'desktop-ipc' || value === 'headless-local';
+}
+
 function messageMatchesRunKeys(message, keys) {
   if (!keys.size) {
     return false;
@@ -67,9 +83,16 @@ function preserveLocalActivityMessages(current = [], loaded = []) {
       if (loaded.some((item) => item?.role === 'activity' && messageMatchesRunKeys(item, keys))) {
         return false;
       }
+      if (isTransientActivityMessage(message) && loadedHasAssistantForActivity(loaded, message)) {
+        return false;
+      }
       return loaded.some((item) => messageMatchesRunKeys(item, keys)) || ['running', 'queued'].includes(String(message?.status || ''));
     })
-    .map((message) => completeLocalActivityMessage(message, loaded));
+    .map((message) =>
+      isTransientActivityMessage(message)
+        ? message
+        : completeLocalActivityMessage(message, loaded)
+    );
 
   if (!preserved.length) {
     return loaded;
@@ -83,10 +106,10 @@ function preserveLocalActivityMessages(current = [], loaded = []) {
 }
 
 function desktopBridgeUsesExternalThreadRefresh(bridge = null) {
-  return Boolean(bridge?.connected && bridge?.mode === 'desktop-ipc');
+  return Boolean(bridge?.connected && ['desktop-ipc', 'headless-local'].includes(bridge?.mode));
 }
 
-export function desktopRunningActivityPayload(messages = [], sessionId = '') {
+export function desktopRunningActivityPayload(messages = [], sessionId = '', selectedRunRuntime = null) {
   if (!Array.isArray(messages)) {
     return null;
   }
@@ -111,9 +134,9 @@ export function desktopRunningActivityPayload(messages = [], sessionId = '') {
   }
 
   return {
-    source: 'desktop-thread',
+    source: selectedRunRuntime?.source || 'desktop-thread',
     sessionId: runningActivity.sessionId || targetSessionId || null,
-    turnId: runningActivity.turnId || runningActivity.sessionId || targetSessionId || null,
+    turnId: runningActivity.turnId || selectedRunRuntime?.turnId || runningActivity.sessionId || targetSessionId || null,
     startedAt: runningActivity.startedAt || runningActivity.timestamp || null,
     timestamp: runningActivity.timestamp || runningActivity.startedAt || new Date().toISOString(),
     steerable: false
@@ -121,7 +144,7 @@ export function desktopRunningActivityPayload(messages = [], sessionId = '') {
 }
 
 function desktopCompletedActivityPayload(messages = [], sessionId = '', selectedRunRuntime = null) {
-  if (!Array.isArray(messages) || selectedRunRuntime?.status !== 'running' || selectedRunRuntime?.source !== 'desktop-thread') {
+  if (!Array.isArray(messages) || selectedRunRuntime?.status !== 'running' || !isDesktopRuntimeSource(selectedRunRuntime?.source)) {
     return null;
   }
   const targetSessionId = String(sessionId || '');
@@ -147,7 +170,7 @@ function desktopCompletedActivityPayload(messages = [], sessionId = '', selected
   }
 
   return {
-    source: 'desktop-thread',
+    source: selectedRunRuntime.source || 'desktop-thread',
     sessionId: completedActivity.sessionId || targetSessionId || null,
     turnId: completedActivity.turnId || selectedRunRuntime.turnId || null,
     completedAt: completedActivity.completedAt || completedActivity.timestamp || new Date().toISOString(),
@@ -163,7 +186,7 @@ export function syncDesktopActivityRuntimeFromMessages({
   clearRun = null,
   markSessionCompleteNotice = null
 } = {}) {
-  const payload = desktopRunningActivityPayload(messages, sessionId);
+  const payload = desktopRunningActivityPayload(messages, sessionId, selectedRunRuntime);
   if (payload) {
     markRun?.(payload);
     return 'marked';
@@ -172,7 +195,7 @@ export function syncDesktopActivityRuntimeFromMessages({
   const completedPayload = desktopCompletedActivityPayload(messages, sessionId, selectedRunRuntime);
   if (completedPayload) {
     clearRun?.({
-      source: 'desktop-thread',
+      source: selectedRunRuntime.source || 'desktop-thread',
       sessionId,
       turnId: selectedRunRuntime.turnId || null
     });
@@ -180,9 +203,9 @@ export function syncDesktopActivityRuntimeFromMessages({
     return 'completed';
   }
 
-  if (selectedRunRuntime?.status === 'running' && selectedRunRuntime?.source === 'desktop-thread') {
+  if (selectedRunRuntime?.status === 'running' && isDesktopRuntimeSource(selectedRunRuntime?.source)) {
     clearRun?.({
-      source: 'desktop-thread',
+      source: selectedRunRuntime.source || 'desktop-thread',
       sessionId,
       turnId: selectedRunRuntime.turnId || null
     });

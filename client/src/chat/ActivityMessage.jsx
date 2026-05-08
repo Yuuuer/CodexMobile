@@ -2,12 +2,12 @@ import { ChevronDown } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatDuration, formatDurationMs } from '../app/session-utils.js';
 import { activityCardShouldOpen } from './activity-card-state.js';
-import { isPlaceholderActivityMessage, isVisibleActivityStep } from './activity-model.js';
+import { isVisibleActivityStep, shouldRenderActivityMessageInChat } from './activity-model.js';
 import { ActivityTimeline } from './ActivityTimeline.jsx';
 import { projectActivityView } from './activity-timeline-projection.js';
 
 export function ActivityMessage({ message, now = Date.now() }) {
-  if (isPlaceholderActivityMessage(message)) {
+  if (!shouldRenderActivityMessageInChat(message)) {
     return null;
   }
   const running = message.status === 'running' || message.status === 'queued';

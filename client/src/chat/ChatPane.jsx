@@ -1,5 +1,5 @@
 import { AlertCircle, ArrowDown, Loader2, ShieldCheck } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { isNearChatBottom, shouldFollowChatOutput } from '../chat-scroll.js';
 import { ChatMessage } from './ChatMessage.jsx';
 
@@ -11,6 +11,7 @@ export function ChatPane({ messages, selectedSession, loading = false, loadError
   const [showScrollLatest, setShowScrollLatest] = useState(false);
   const hasMessages = messages.length > 0;
   const sessionId = selectedSession?.id || '';
+  const pinnedBeforeRender = bottomPinnedRef.current;
 
   const scrollToBottom = useCallback((behavior = 'auto') => {
     const pane = paneRef.current;
@@ -37,20 +38,18 @@ export function ChatPane({ messages, selectedSession, loading = false, loadError
     return () => pane.removeEventListener('scroll', updatePinnedState);
   }, [hasMessages]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const force = Boolean(hasMessages && sessionId && pendingInitialScrollSessionRef.current === sessionId);
-    if (!shouldFollowChatOutput({ pinnedToBottom: bottomPinnedRef.current, running, force })) {
+    if (!shouldFollowChatOutput({ pinnedToBottom: bottomPinnedRef.current, pinnedBeforeUpdate: pinnedBeforeRender, running, force })) {
       return undefined;
     }
-    const frame = requestAnimationFrame(() => {
-      scrollToBottom('auto');
-      setShowScrollLatest(false);
-      if (force) {
-        pendingInitialScrollSessionRef.current = null;
-        bottomPinnedRef.current = true;
-      }
-    });
-    return () => cancelAnimationFrame(frame);
+    scrollToBottom('auto');
+    setShowScrollLatest(false);
+    bottomPinnedRef.current = true;
+    if (force) {
+      pendingInitialScrollSessionRef.current = null;
+    }
+    return undefined;
   }, [messages, running, scrollToBottom, hasMessages, sessionId]);
 
   useEffect(() => {
@@ -67,12 +66,12 @@ export function ChatPane({ messages, selectedSession, loading = false, loadError
     return () => observer.disconnect();
   }, [running, scrollToBottom]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     pendingInitialScrollSessionRef.current = selectedSession?.id || null;
     bottomPinnedRef.current = true;
     setShowScrollLatest(false);
-    const frame = requestAnimationFrame(() => scrollToBottom('auto'));
-    return () => cancelAnimationFrame(frame);
+    scrollToBottom('auto');
+    return undefined;
   }, [selectedSession?.id, scrollToBottom]);
 
   if (loading) {

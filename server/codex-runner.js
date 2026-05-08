@@ -781,6 +781,8 @@ export async function runCodexTurn({ sessionId, draftSessionId, projectPath, mes
             previousSessionId: fromSessionId,
             turnId,
             projectPath,
+            cwd: params.thread.cwd || workingDirectory,
+            filePath: params.thread.path || params.thread.filePath || null,
             startedAt: new Date().toISOString()
           });
           return;
@@ -839,6 +841,8 @@ export async function runCodexTurn({ sessionId, draftSessionId, projectPath, mes
       previousSessionId,
       turnId,
       projectPath,
+      cwd: desktopThread.cwd || workingDirectory,
+      filePath: desktopThread.path || desktopThread.filePath || null,
       startedAt: new Date().toISOString()
     });
     emitStatus(emit, { sessionId: currentSessionId, turnId, kind: 'reasoning', status: 'running', label: '正在思考' });

@@ -77,7 +77,7 @@ export async function deleteMobileSession(sessionId) {
   return true;
 }
 
-export async function registerMobileSession({ id, projectPath, projectless = false, title, summary, titleLocked = false, updatedAt, messages }) {
+export async function registerMobileSession({ id, projectPath, projectless = false, title, summary, titleLocked = false, updatedAt, messages, filePath }) {
   if (!id || (!projectPath && !projectless) || String(id).startsWith('draft-') || String(id).startsWith('codex-')) {
     return null;
   }
@@ -96,7 +96,8 @@ export async function registerMobileSession({ id, projectPath, projectless = fal
     titleLocked: Boolean(existing?.titleLocked || titleLocked),
     summary: summary || title || existing?.summary || 'CodexMobile 对话',
     updatedAt: now,
-    source: existing?.source || 'codexmobile'
+    source: existing?.source || 'codexmobile',
+    filePath: filePath || existing?.filePath || null
   };
   if (Array.isArray(messages)) {
     const seenMessageIds = new Set();

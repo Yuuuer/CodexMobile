@@ -6,6 +6,11 @@ import {
   sessionMessagesApiPath
 } from './session-utils.js';
 import { normalizeContextStatus } from './context-status.js';
+import {
+  preferredProjectFromStoredSelection,
+  readStoredSelection,
+  selectedSessionFromStoredSelection
+} from './selection-persistence.js';
 
 export function useAppBootstrap({
   defaultStatus,
@@ -37,6 +42,7 @@ export function useAppBootstrap({
         ? { chooseLatest: options, preserveSelection: false }
         : {
           chooseLatest: options?.chooseLatest ?? true,
+          preferredSessionId: options?.preferredSessionId || '',
           preserveSelection: Boolean(options?.preserveSelection),
           silent: Boolean(options?.silent)
         };
@@ -54,60 +60,45 @@ export function useAppBootstrap({
       const data = await apiFetch(`/api/projects/${encodeURIComponent(project.id)}/sessions`);
       const apiSessions = data.sessions || [];
       const currentSession = selectedSessionRef.current;
-      const preserveCurrent =
-        settings.preserveSelection &&
-        currentSession?.projectId === project.id &&
-        (isDraftSession(currentSession) || apiSessions.some((session) => session.id === currentSession.id));
+      const sameProjectCurrent =
+        currentSession?.projectId === project.id ? currentSession : null;
+      const selected = selectedSessionFromStoredSelection(apiSessions, {
+        preserveSelection: settings.preserveSelection,
+        currentSession: sameProjectCurrent,
+        storedSessionId: settings.preferredSessionId,
+        chooseLatest: settings.chooseLatest
+      });
+      const preserveCurrent = Boolean(selected && currentSession?.id === selected.id);
       const nextSessions =
         preserveCurrent && isDraftSession(currentSession)
           ? [currentSession, ...apiSessions.filter((session) => session.id !== currentSession.id)]
           : apiSessions;
       setSessionsByProject((current) => ({ ...current, [project.id]: nextSessions }));
 
-      if (preserveCurrent) {
-        if (isDraftSession(currentSession)) {
-          selectedSessionRef.current = currentSession;
-          setSelectedSession(currentSession);
-          setMessages([]);
-          setContextStatus(emptyContextStatus());
-          return;
-        }
-        const refreshed = nextSessions.find((session) => session.id === currentSession.id);
-        if (refreshed) {
-          setSelectedSession((current) => (current?.id === refreshed.id ? { ...current, ...refreshed } : current));
-          setContextStatus(normalizeContextStatus(refreshed.context || defaultStatus.context, defaultStatus.context));
-          const messageData = await apiFetch(sessionMessagesApiPath(refreshed.id));
-          if (selectedSessionRef.current?.id === refreshed.id) {
-            setMessages(messageData.messages || []);
-            setContextStatus(
-              normalizeContextStatus(messageData.context || refreshed.context || defaultStatus.context, defaultStatus.context)
-            );
-          }
-          return;
-        }
-      }
-
-      if (settings.chooseLatest) {
-        const next = nextSessions[0] || null;
+      if (selected) {
+        const next = isDraftSession(selected)
+          ? selected
+          : nextSessions.find((session) => session.id === selected.id) || selected;
         selectedSessionRef.current = next;
-        setSelectedSession(next);
-        if (next) {
-          setContextStatus(normalizeContextStatus(next.context || defaultStatus.context, defaultStatus.context));
-          const messageData = await apiFetch(sessionMessagesApiPath(next.id));
-          if (selectedSessionRef.current?.id === next.id) {
-            setMessages(messageData.messages || []);
-            setContextStatus(normalizeContextStatus(messageData.context || next.context || defaultStatus.context, defaultStatus.context));
-          }
-        } else {
+        if (isDraftSession(next)) {
+          setSelectedSession(next);
           setMessages([]);
           setContextStatus(emptyContextStatus());
+          return;
         }
-      } else {
-        selectedSessionRef.current = null;
-        setSelectedSession(null);
-        setMessages([]);
-        setContextStatus(emptyContextStatus());
+        setSelectedSession((current) => (current?.id === next.id ? { ...current, ...next } : next));
+        setContextStatus(normalizeContextStatus(next.context || defaultStatus.context, defaultStatus.context));
+        const messageData = await apiFetch(sessionMessagesApiPath(next.id));
+        if (selectedSessionRef.current?.id === next.id) {
+          setMessages(messageData.messages || []);
+          setContextStatus(normalizeContextStatus(messageData.context || next.context || defaultStatus.context, defaultStatus.context));
+        }
+        return;
       }
+      selectedSessionRef.current = null;
+      setSelectedSession(null);
+      setMessages([]);
+      setContextStatus(emptyContextStatus());
     } finally {
       if (!settings.silent) {
         setLoadingProjectId((current) => (current === project.id ? null : current));
@@ -126,25 +117,29 @@ export function useAppBootstrap({
   const loadProjects = useCallback(async (options = {}) => {
     const preserveSelection = Boolean(options?.preserveSelection);
     const refreshSessions = options?.refreshSessions !== false;
+    const storedSelection = readStoredSelection();
     const data = await apiFetch('/api/projects');
     const list = data.projects || [];
     setProjects(list);
     const currentProject = selectedProjectRef.current;
-    const preferred =
-      (preserveSelection && currentProject
-        ? list.find((project) => project.id === currentProject.id)
-        : null) ||
-      list.find((project) => project.name.toLowerCase() === 'codexmobile') ||
-      list.find((project) => project.path.toLowerCase().includes('codexmobile')) ||
-      list[0] ||
-      null;
+    const preferred = preferredProjectFromStoredSelection(list, {
+      preserveSelection,
+      currentProject,
+      storedProjectId: storedSelection.projectId
+    });
     setSelectedProject(preferred);
     if (preferred) {
       setExpandedProjectIds((current) => ({ ...current, [preferred.id]: true }));
     }
     if (refreshSessions) {
+      const shouldRestoreStoredSession = Boolean(
+        preferred?.id &&
+        storedSelection.projectId === preferred.id &&
+        (!preserveSelection || !selectedSessionRef.current)
+      );
       await loadSessions(preferred, {
         chooseLatest: !preserveSelection || !selectedSessionRef.current,
+        preferredSessionId: shouldRestoreStoredSession ? storedSelection.sessionId : '',
         preserveSelection,
         silent: Boolean(options?.silent)
       });

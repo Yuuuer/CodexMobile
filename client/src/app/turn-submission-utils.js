@@ -90,6 +90,26 @@ export function restoredComposerText(current, nextText) {
   return `${base}\n${value}`;
 }
 
+export function shouldPollTurnEndpointAfterSend(result = {}) {
+  return !['desktop-ipc', 'headless-local'].includes(result?.desktopBridge?.mode);
+}
+
+export function localHandoffStatusPayload({ sessionId, previousSessionId = null, turnId, timestamp = new Date().toISOString() } = {}) {
+  return {
+    sessionId,
+    previousSessionId,
+    turnId,
+    kind: 'turn',
+    status: 'running',
+    label: '后台启动中',
+    detail: '',
+    timestamp,
+    startedAt: timestamp,
+    transient: true,
+    source: 'local-handoff'
+  };
+}
+
 export function completeLocalAbortMessages(current, payload = {}) {
   const completedAt = payload.completedAt || payload.timestamp || new Date().toISOString();
   return upsertStatusMessage(

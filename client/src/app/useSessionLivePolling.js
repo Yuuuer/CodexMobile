@@ -56,7 +56,8 @@ export function useSessionLivePolling({
         selectedSessionRef.current?.runtime?.status === 'running' ||
         selectedSession.runtime?.status === 'running' ||
         selectedRunRuntime?.source === 'desktop-thread' ||
-        selectedRunRuntime?.source === 'desktop-ipc';
+        selectedRunRuntime?.source === 'desktop-ipc' ||
+        selectedRunRuntime?.source === 'headless-local';
       const hasExternalThreadRefresh = Boolean(hasDesktopThreadRuntime);
       if (!shouldPollSelectedSessionMessages({
         hasSelectedRunning,

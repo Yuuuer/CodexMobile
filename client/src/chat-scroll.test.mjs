@@ -17,3 +17,13 @@ test('does not force-follow running output after the user scrolls up', () => {
 test('allows an explicit session-load scroll to override the pinned state', () => {
   assert.equal(shouldFollowChatOutput({ pinnedToBottom: false, force: true }), true);
 });
+
+test('keeps following output when a message replacement temporarily loses the bottom pin', () => {
+  assert.equal(
+    shouldFollowChatOutput({
+      pinnedToBottom: false,
+      pinnedBeforeUpdate: true
+    }),
+    true
+  );
+});

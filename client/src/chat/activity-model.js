@@ -4,7 +4,7 @@ import { mergeActivityStep } from '../activity-merge.js';
 import { payloadRunKeys } from '../app/session-utils.js';
 
 export function statusMessageId(payload) {
-  return `status-${payload.turnId || payload.sessionId || 'current'}`;
+  return `status-${payload.clientTurnId || payload.turnId || payload.sessionId || 'current'}`;
 }
 
 export function larkCliActivityLabel(value) {
@@ -378,6 +378,20 @@ export function isPlaceholderActivityMessage(message) {
   });
 }
 
+export function shouldRenderActivityMessageInChat(message) {
+  if (message?.role !== 'activity') {
+    return true;
+  }
+  if (
+    message?.transient &&
+    message?.source === 'local-handoff' &&
+    String(message?.status || '') !== 'failed'
+  ) {
+    return false;
+  }
+  return !isPlaceholderActivityMessage(message);
+}
+
 export function completeActivityMessagesForTurn(current, payload) {
   const keys = new Set(payloadRunKeys(payload));
   if (!keys.size) {
@@ -502,7 +516,11 @@ export function upsertStatusMessage(current, payload) {
     id,
     role: 'activity',
     turnId: normalizedPayload.turnId || previous?.turnId || null,
+    clientTurnId: normalizedPayload.clientTurnId || previous?.clientTurnId || null,
     sessionId: normalizedPayload.sessionId || previous?.sessionId || null,
+    previousSessionId: normalizedPayload.previousSessionId || previous?.previousSessionId || null,
+    source: normalizedPayload.source || previous?.source || null,
+    transient: normalizedPayload.transient ?? previous?.transient ?? false,
     content: isTurnLevel ? (normalizedPayload.label || previous?.content || '正在处理') : (previous?.content || '正在处理'),
     label: isTurnLevel ? (normalizedPayload.label || previous?.label || '正在处理') : (previous?.label || '正在处理'),
     detail,
@@ -540,7 +558,11 @@ export function upsertActivityMessage(current, payload) {
     id,
     role: 'activity',
     turnId: payload.turnId || previous?.turnId || null,
+    clientTurnId: payload.clientTurnId || previous?.clientTurnId || null,
     sessionId: payload.sessionId || previous?.sessionId || null,
+    previousSessionId: payload.previousSessionId || previous?.previousSessionId || null,
+    source: payload.source || previous?.source || null,
+    transient: payload.transient ?? previous?.transient ?? false,
     content: previous?.content || '正在处理',
     label: previous?.label || '正在处理',
     detail: payload.detail || previous?.detail || activity?.detail || '',

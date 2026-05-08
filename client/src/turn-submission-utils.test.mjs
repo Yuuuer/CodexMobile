@@ -9,6 +9,7 @@ import {
   restoredComposerText,
   sessionForTurnSelection,
   selectedSkillsForPaths,
+  shouldPollTurnEndpointAfterSend,
   turnMatchesSelection
 } from './app/turn-submission-utils.js';
 
@@ -119,4 +120,19 @@ test('completeLocalAbortMessages finishes the optimistic running activity', () =
   assert.equal(next[0].label, '已中止');
   assert.equal(next[0].activities[0].status, 'completed');
   assert.equal(next[0].completedAt, '2026-05-08T02:00:05.000Z');
+});
+
+test('external thread handoff uses thread refresh instead of client turn polling', () => {
+  assert.equal(
+    shouldPollTurnEndpointAfterSend({ desktopBridge: { mode: 'desktop-ipc' } }),
+    false
+  );
+  assert.equal(
+    shouldPollTurnEndpointAfterSend({ desktopBridge: { mode: 'headless-local' } }),
+    false
+  );
+  assert.equal(
+    shouldPollTurnEndpointAfterSend({}),
+    true
+  );
 });

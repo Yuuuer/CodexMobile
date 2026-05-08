@@ -17,12 +17,14 @@ import {
 import {
   displayMessageForTurn,
   completeLocalAbortMessages,
+  localHandoffStatusPayload,
   prepareComposerSubmission,
   projectForTurnSelection,
   realSessionIdFromTurn,
   restoredComposerText,
   sessionForTurnSelection,
   selectedSkillsForPaths,
+  shouldPollTurnEndpointAfterSend,
   turnMatchesSelection
 } from './turn-submission-utils.js';
 
@@ -286,30 +288,26 @@ export function useTurnSubmission({
       )
     }));
     const submittedAt = new Date().toISOString();
-    setMessages((current) =>
-      upsertStatusMessage(
-        [
-          ...current,
-          {
-            id: `local-${Date.now()}`,
-            role: 'user',
-            content: optimisticContent,
-            timestamp: submittedAt,
-            sessionId: optimisticSessionId,
-            turnId
-          }
-        ],
-        {
-          sessionId: optimisticSessionId,
-          turnId,
-          kind: 'reasoning',
-          status: 'running',
-          label: '正在思考中',
-          timestamp: submittedAt,
-          startedAt: submittedAt
-        }
-      )
-    );
+    const localUserMessage = {
+      id: `local-${Date.now()}`,
+      role: 'user',
+      content: optimisticContent,
+      timestamp: submittedAt,
+      sessionId: optimisticSessionId,
+      turnId
+    };
+    setMessages((current) => {
+      const next = [...current, localUserMessage];
+      if (!draftSessionId || outgoingSessionId) {
+        return next;
+      }
+      return upsertStatusMessage(next, localHandoffStatusPayload({
+        sessionId: optimisticSessionId,
+        previousSessionId: draftSessionId,
+        turnId,
+        timestamp: submittedAt
+      }));
+    });
 
     try {
       const result = await apiFetch('/api/chat/send', {
@@ -332,22 +330,31 @@ export function useTurnSubmission({
       });
       const resultTurnId = result.turnId || turnId;
       const resultSessionId = result.sessionId || optimisticSessionId;
-      if (resultTurnId !== turnId || resultSessionId !== optimisticSessionId || result.desktopBridge?.mode === 'desktop-ipc') {
+      const resultBridgeMode = result.desktopBridge?.mode || null;
+      const resultRuntimeSource =
+        resultBridgeMode === 'desktop-ipc'
+          ? 'desktop-ipc'
+          : resultBridgeMode === 'headless-local'
+            ? 'headless-local'
+            : null;
+      if (resultTurnId !== turnId || resultSessionId !== optimisticSessionId || resultRuntimeSource) {
         markRun({
           turnId: resultTurnId,
           sessionId: resultSessionId,
           previousSessionId: draftSessionId || outgoingSessionId,
           clientTurnId: turnId,
-          source: result.desktopBridge?.mode === 'desktop-ipc' ? 'desktop-ipc' : null,
-          steerable: result.desktopBridge?.mode === 'desktop-ipc' ? false : undefined
+          source: resultRuntimeSource,
+          steerable: resultBridgeMode === 'desktop-ipc' ? false : undefined
         });
       }
-      pollTurnUntilComplete({
-        turnId: resultTurnId,
-        optimisticSessionId,
-        projectId: project.id,
-        previousSessionId: draftSessionId || outgoingSessionId
-      });
+      if (shouldPollTurnEndpointAfterSend(result)) {
+        pollTurnUntilComplete({
+          turnId: resultTurnId,
+          optimisticSessionId,
+          projectId: project.id,
+          previousSessionId: draftSessionId || outgoingSessionId
+        });
+      }
       return {
         turnId: resultTurnId,
         optimisticSessionId,

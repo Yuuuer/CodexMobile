@@ -10,6 +10,41 @@ import {
 import { sameUserMessageContent } from '../chat/message-identity.js';
 import { mergeContextStatus, normalizeContextStatus } from './context-status.js';
 
+const EXTERNAL_THREAD_SOURCES = new Set(['desktop-ipc', 'desktop-thread', 'headless-local']);
+
+export function isExternalThreadPayload(payload = {}) {
+  return EXTERNAL_THREAD_SOURCES.has(payload?.source);
+}
+
+export function isDesktopThreadStatusPayload(payload = {}) {
+  return isExternalThreadPayload(payload);
+}
+
+export function shouldRenderStatusMessageForPayload(payload = {}) {
+  if (isExternalThreadPayload(payload)) {
+    return false;
+  }
+  return true;
+}
+
+export function shouldRenderActivityMessageForPayload(payload = {}) {
+  return !isExternalThreadPayload(payload);
+}
+
+export function shouldRenderAssistantMessageForPayload(payload = {}) {
+  return !isExternalThreadPayload(payload);
+}
+
+export function shouldRefreshDesktopThreadForPayload(payload = {}) {
+  if (!isExternalThreadPayload(payload)) {
+    return false;
+  }
+  if (payload.type === 'chat-complete') {
+    return true;
+  }
+  return payload.type === 'status-update' && payload.kind === 'turn' && ['completed', 'failed'].includes(payload.status);
+}
+
 export function useAppWebSocket({
   useEffect,
   authenticated,
@@ -168,6 +203,9 @@ export function useAppWebSocket({
           if (!payloadMatchesCurrentConversation(payload)) {
             return;
           }
+          if (!shouldRenderAssistantMessageForPayload(payload)) {
+            return;
+          }
           if (payload.phase === 'commentary') {
             setMessages((current) =>
               upsertStatusMessage(current, {
@@ -200,8 +238,15 @@ export function useAppWebSocket({
           if (!payloadMatchesCurrentConversation(payload)) {
             return;
           }
+          if (shouldRefreshDesktopThreadForPayload(payload)) {
+            scheduleTurnRefresh(payload);
+            return;
+          }
           if (payload.kind === 'turn' && payload.status === 'completed') {
             markTurnCompleted(payload);
+            return;
+          }
+          if (!shouldRenderStatusMessageForPayload(payload)) {
             return;
           }
           setMessages((current) => upsertStatusMessage(current, payload));
@@ -213,6 +258,9 @@ export function useAppWebSocket({
           }
           notifyFromPayload(payload);
           if (!payloadMatchesCurrentConversation(payload)) {
+            return;
+          }
+          if (!shouldRenderActivityMessageForPayload(payload)) {
             return;
           }
           setMessages((current) => upsertActivityMessage(current, payload));
@@ -239,6 +287,10 @@ export function useAppWebSocket({
           if (payload.type === 'chat-complete') {
             if (payload.context) {
               setContextStatus((current) => mergeContextStatus(current, payload.context, defaultStatus.context));
+            }
+            if (shouldRefreshDesktopThreadForPayload(payload)) {
+              scheduleTurnRefresh(payload);
+              return;
             }
             markTurnCompleted(payload);
             scheduleTurnRefresh(payload);

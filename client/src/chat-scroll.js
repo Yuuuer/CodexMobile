@@ -10,6 +10,6 @@ export function isNearChatBottom(pane, threshold = CHAT_BOTTOM_THRESHOLD_PX) {
   return scrollHeight - scrollTop - clientHeight < threshold;
 }
 
-export function shouldFollowChatOutput({ pinnedToBottom, force = false }) {
-  return Boolean(force || pinnedToBottom);
+export function shouldFollowChatOutput({ pinnedToBottom, pinnedBeforeUpdate = false, force = false }) {
+  return Boolean(force || pinnedToBottom || pinnedBeforeUpdate);
 }

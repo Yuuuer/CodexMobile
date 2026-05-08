@@ -117,3 +117,65 @@ test('session message reader merges raw and collaboration activities only when r
     ['sort', 3]
   ]);
 });
+
+test('session message reader falls back to rollout jsonl when desktop thread is not loaded', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'codexmobile-message-reader-rollout-'));
+  try {
+    const rolloutPath = path.join(dir, 'rollout.jsonl');
+    await fs.writeFile(rolloutPath, [
+      JSON.stringify({
+        timestamp: '2026-05-08T17:01:40.000Z',
+        type: 'session_meta',
+        payload: { id: 'session-1', cwd: dir }
+      }),
+      JSON.stringify({
+        timestamp: '2026-05-08T17:01:41.000Z',
+        type: 'turn_context',
+        payload: { turn_id: 'turn-1', cwd: dir }
+      }),
+      JSON.stringify({
+        timestamp: '2026-05-08T17:01:42.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: '晚上好呀 你困吗' }]
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-05-08T17:01:43.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: '晚上好，我不困，随时在。' }]
+        }
+      })
+    ].join('\n'));
+
+    const notLoadedError = new Error('thread not loaded: session-1');
+    const reader = createSessionMessageReader({
+      readDeletedMessageIds: async () => new Set(),
+      readDesktopThread: async () => {
+        throw notLoadedError;
+      },
+      resolveSessionThread: async (sessionId) => ({
+        id: sessionId,
+        filePath: rolloutPath
+      })
+    });
+
+    const result = await reader.readSessionMessages('session-1');
+
+    assert.deepEqual(
+      result.messages.map((message) => [message.role, message.content, message.turnId]),
+      [
+        ['user', '晚上好呀 你困吗', 'turn-1'],
+        ['assistant', '晚上好，我不困，随时在。', 'turn-1']
+      ]
+    );
+    assert.equal(result.total, 2);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
