@@ -1,4 +1,4 @@
-import { sendJson } from './http-utils.js';
+import { readBody, sendJson } from './http-utils.js';
 import { searchProjectFiles as defaultSearchProjectFiles } from './file-search.js';
 import { saveUpload as defaultSaveUpload } from './upload-service.js';
 
@@ -18,9 +18,25 @@ export function createFileRouteHandler({
   return async function handleFileApi(req, res, url) {
     const method = req.method || 'GET';
     const pathname = url.pathname;
+    const localFileRoute = pathname === '/api/local-file' || pathname.startsWith('/api/local-file/');
 
     if (method === 'GET' && pathname === '/api/local-image') {
       await staticService.sendLocalImage(req, res, url);
+      return true;
+    }
+
+    if (method === 'GET' && localFileRoute) {
+      await staticService.sendLocalFile(req, res, url);
+      return true;
+    }
+
+    if (method === 'PUT' && localFileRoute) {
+      try {
+        const body = await readBody(req, { maxBytes: 6 * 1024 * 1024 });
+        await staticService.writeLocalFile(req, res, url, body);
+      } catch (error) {
+        sendJson(res, error.message === 'Request body too large' ? 413 : 400, { error: error.message || 'Invalid request body' });
+      }
       return true;
     }
 

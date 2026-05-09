@@ -138,6 +138,19 @@ export function isLocalImageSource(value) {
   );
 }
 
+export function isLocalFileSource(value) {
+  const raw = String(value || '').trim();
+  if (!raw || raw.startsWith('/api/') || raw.startsWith('/generated/') || raw.startsWith('/assets/')) {
+    return false;
+  }
+  return (
+    /^file:\/\//i.test(raw) ||
+    /^\/(?:Users|private|var|tmp|Volumes)\//.test(raw) ||
+    /^~[\\/]/.test(raw) ||
+    /^[A-Za-z]:[\\/]/.test(raw)
+  );
+}
+
 export function safeDecodeUriComponent(value) {
   try {
     return decodeURIComponent(value);
@@ -150,6 +163,26 @@ export function localImageApiPath(value) {
   const raw = String(value || '').trim();
   const normalized = /%[0-9a-f]{2}/i.test(raw) ? safeDecodeUriComponent(raw) : raw;
   return `/api/local-image?path=${encodeURIComponent(normalized)}`;
+}
+
+export function localFileApiPath(value, token = '') {
+  const raw = String(value || '').trim();
+  const normalized = /%[0-9a-f]{2}/i.test(raw) ? safeDecodeUriComponent(raw) : raw;
+  const tokenValue = String(token || '').trim();
+  const tokenParam = tokenValue ? `&token=${encodeURIComponent(tokenValue)}` : '';
+  return `/api/local-file?path=${encodeURIComponent(normalized)}${tokenParam}`;
+}
+
+export function localFilePreviewPath(value, token = '') {
+  const raw = String(value || '').trim();
+  const normalized = /%[0-9a-f]{2}/i.test(raw) ? safeDecodeUriComponent(raw) : raw;
+  const params = new URLSearchParams();
+  params.set('path', normalized);
+  const tokenValue = String(token || '').trim();
+  if (tokenValue) {
+    params.set('token', tokenValue);
+  }
+  return `/preview/file?${params.toString()}`;
 }
 
 export function dataImageObjectUrl(value) {
@@ -320,14 +353,26 @@ export function isExternalThreadRuntime(runtime) {
   return runtime?.status === 'running' && isExternalThreadRuntimeSource(runtime?.source);
 }
 
+export function isSessionIndexRuntime(runtime) {
+  return runtime?.fromSessionIndex === true;
+}
+
+export function isLiveThreadRuntime(runtime) {
+  return Boolean(runtime && !isSessionIndexRuntime(runtime));
+}
+
+export function isPersistentDesktopThreadRuntime(runtime) {
+  return runtime?.status === 'running' && String(runtime?.source || '') === 'desktop-thread' && !isSessionIndexRuntime(runtime);
+}
+
 export function shouldClearRuntimeWhenNoActiveRuns(runtime) {
-  return runtime?.status === 'running' && !isExternalThreadRuntime(runtime);
+  return runtime?.status === 'running' && !isPersistentDesktopThreadRuntime(runtime);
 }
 
 export function externalThreadRuntimeById(threadRuntimeById = {}) {
   const next = {};
   for (const [key, runtime] of Object.entries(threadRuntimeById || {})) {
-    if (isExternalThreadRuntime(runtime)) {
+    if (isPersistentDesktopThreadRuntime(runtime)) {
       next[key] = runtime;
     }
   }
@@ -347,6 +392,7 @@ function runtimeFromSession(session) {
   return {
     ...session.runtime,
     status: 'running',
+    fromSessionIndex: true,
     source: session.runtime.source || 'desktop-thread',
     sessionId: session.runtime.sessionId || session.id,
     turnId: session.runtime.turnId || session.turnId || null,
@@ -365,7 +411,7 @@ export function reconcileThreadRuntimeWithSessions(threadRuntimeById = {}, sessi
   const next = { ...(threadRuntimeById || {}) };
   for (const [key, runtime] of Object.entries(next)) {
     const sessionId = runtime?.sessionId || (loadedSessionIds.has(key) ? key : '');
-    if (sessionId && loadedSessionIds.has(sessionId) && isExternalThreadRuntime(runtime)) {
+    if (sessionId && loadedSessionIds.has(sessionId) && isSessionIndexRuntime(runtime)) {
       delete next[key];
     }
   }
@@ -376,7 +422,9 @@ export function reconcileThreadRuntimeWithSessions(threadRuntimeById = {}, sessi
       continue;
     }
     for (const key of [session.id, runtime.turnId].filter(Boolean)) {
-      next[key] = runtime;
+      if (!next[key] || isSessionIndexRuntime(next[key])) {
+        next[key] = runtime;
+      }
     }
   }
 
@@ -403,10 +451,7 @@ export function sessionRunBadgeState(session, {
     return null;
   }
   const keys = sessionRunKeys(session);
-  const runtimes = [
-    session.runtime,
-    ...keys.map((key) => threadRuntimeById?.[key])
-  ].filter(Boolean);
+  const runtimes = keys.map((key) => threadRuntimeById?.[key]).filter(isLiveThreadRuntime);
   if (runtimes.some((runtime) => runtime?.status === 'running') || hasRunningKey(runningById, keys)) {
     return 'running';
   }
@@ -421,9 +466,14 @@ export function sessionRunBadgeState(session, {
 
 export function shouldPreserveLocalRunsFromStatus({
   activePollCount = 0,
-  turnRefreshTimerCount = 0
+  turnRefreshTimerCount = 0,
+  forceClear = false
 } = {}) {
-  return activePollCount > 0 || turnRefreshTimerCount > 0;
+  void turnRefreshTimerCount;
+  if (forceClear) {
+    return false;
+  }
+  return activePollCount > 0;
 }
 
 export function shouldDropRunningActivityWhenNoActiveRuns(message) {
@@ -437,6 +487,17 @@ export function shouldDropRunningActivityWhenNoActiveRuns(message) {
     return false;
   }
   return String(message?.kind || '') !== 'desktop';
+}
+
+export function shouldDropRunningActivityMissingFromActiveRuns(message, activeRunKeys = new Set()) {
+  if (!shouldDropRunningActivityWhenNoActiveRuns(message)) {
+    return false;
+  }
+  const keys = payloadRunKeys(message);
+  if (!keys.length) {
+    return true;
+  }
+  return !keys.some((key) => activeRunKeys.has(key));
 }
 
 export function selectedSessionIsRunning({ running = false, hasRunningActivity = false } = {}) {

@@ -280,6 +280,57 @@ test('abortChat falls back to session id when desktop IPC turn id does not match
   assert.equal(service.getTurn('desktop-turn-1').status, 'aborted');
 });
 
+test('abortChat aborts an active headless run before a desktop IPC monitor on the same session', async () => {
+  const interrupted = [];
+  let abortedIdentifier = null;
+  const { service, broadcasts } = makeChatService({
+    getDesktopBridgeStatus: async () => ({
+      strict: true,
+      connected: true,
+      mode: 'desktop-ipc',
+      reason: null,
+      capabilities: { sendToOpenDesktopThread: true, createThread: false }
+    }),
+    startDesktopFollowerTurn: async () => ({ result: { turn: { id: 'desktop-turn-1' } } }),
+    interruptDesktopFollowerTurn: async (conversationId) => {
+      interrupted.push(conversationId);
+      return { ok: true };
+    },
+    readSessionMessages: async () => ({ messages: [] }),
+    getActiveRuns: () => [{
+      sessionId: 'thread-1',
+      previousSessionId: 'thread-1',
+      turnId: 'headless-turn-1',
+      status: 'running',
+      source: 'headless-local'
+    }],
+    abortCodexTurn: (identifier) => {
+      abortedIdentifier = identifier;
+      return true;
+    }
+  });
+
+  await service.sendChat({
+    projectId: 'project-1',
+    sessionId: 'thread-1',
+    clientTurnId: 'client-turn-1',
+    message: '先创建一个桌面 monitor'
+  });
+
+  const aborted = await service.abortChat({
+    sessionId: 'thread-1',
+    turnId: 'headless-turn-1',
+    previousSessionId: 'thread-1'
+  }, { remoteAddress: '127.0.0.1' });
+
+  assert.equal(aborted, true);
+  assert.equal(abortedIdentifier, 'headless-turn-1');
+  assert.deepEqual(interrupted, []);
+  assert.equal(broadcasts.at(-1).type, 'chat-aborted');
+  assert.equal(broadcasts.at(-1).source, 'headless-local');
+  assert.equal(broadcasts.at(-1).turnId, 'headless-turn-1');
+});
+
 test('abortChat interrupts a desktop-origin running session by session id', async () => {
   const interrupted = [];
   const { service, broadcasts } = makeChatService({
@@ -364,9 +415,44 @@ test('sendChat sends desktop-ipc plan requests with desktop collaboration mode',
   assert.deepEqual(started.params.collaborationMode, collaborationUpdate.collaborationMode);
 });
 
-test('sendChat falls back to headless local when desktop-ipc has no thread owner', async () => {
-  let runPayload = null;
+test('sendChat clears desktop collaboration mode for normal follow-up turns', async () => {
+  let started = null;
+  let collaborationUpdate = 'not-called';
   const { service } = makeChatService({
+    getDesktopBridgeStatus: async () => ({
+      strict: true,
+      connected: true,
+      mode: 'desktop-ipc',
+      reason: null,
+      capabilities: { sendToOpenDesktopThread: true, createThread: false }
+    }),
+    setDesktopFollowerCollaborationMode: async (conversationId, collaborationMode) => {
+      collaborationUpdate = { conversationId, collaborationMode };
+      return { ok: true };
+    },
+    startDesktopFollowerTurn: async (conversationId, params) => {
+      started = { conversationId, params };
+      return { result: { turn: { id: 'desktop-normal-turn-1' } } };
+    }
+  });
+
+  const result = await service.sendChat({
+    projectId: 'project-1',
+    sessionId: 'thread-1',
+    message: '执行计划'
+  });
+
+  assert.equal(result.delivery, 'started');
+  assert.deepEqual(collaborationUpdate, {
+    conversationId: 'thread-1',
+    collaborationMode: null
+  });
+  assert.equal(started.params.collaborationMode, null);
+});
+
+test('sendChat falls back to headless local when an existing desktop-ipc thread has no owner', async () => {
+  let runPayload = null;
+  const { service, broadcasts } = makeChatService({
     getDesktopBridgeStatus: async () => ({
       strict: true,
       connected: true,
@@ -403,9 +489,10 @@ test('sendChat falls back to headless local when desktop-ipc has no thread owner
   assert.equal(result.desktopBridge.mode, 'headless-local');
   assert.equal(runPayload.sessionId, 'thread-1');
   assert.match(runPayload.message, /桌面窗口不在时继续执行/);
+  assert.equal(broadcasts.filter((payload) => payload.type === 'user-message').length, 1);
 });
 
-test('sendChat falls back to headless local when desktop-ipc settings sync times out before start', async () => {
+test('sendChat falls back to headless local when settings sync times out before start', async () => {
   let runPayload = null;
   let startCalled = false;
   const { service } = makeChatService({
@@ -446,11 +533,11 @@ test('sendChat falls back to headless local when desktop-ipc settings sync times
   });
 
   assert.equal(result.accepted, true);
-  assert.equal(result.delivery, 'started');
   assert.equal(result.desktopBridge.mode, 'headless-local');
   assert.equal(startCalled, false);
   assert.equal(runPayload.sessionId, 'thread-1');
-  assert.match(runPayload.message, /确认执行这个计划/);
+  assert.equal(runPayload.model, 'gpt-5.5');
+  assert.equal(runPayload.reasoningEffort, 'medium');
 });
 
 test('sendChat waits for a desktop-ipc owner before falling back to headless local', async () => {

@@ -6,6 +6,7 @@ import { applyMacSystemProxyEnv } from './system-proxy-env.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const logDir = path.join(root, '.codexmobile');
 const port = Number(process.env.PORT || 3321);
+const launchdLabel = 'com.codexmobile.bridge';
 fs.mkdirSync(logDir, { recursive: true });
 
 const outPath = path.join(logDir, 'server.out.log');
@@ -83,6 +84,39 @@ if (proxyEnv.applied) {
   console.log(`Using macOS system proxy for background Codex requests: ${proxyEnv.proxyUrl}`);
 }
 
+function launchdDomain() {
+  const uid = process.getuid?.();
+  return Number.isInteger(uid) ? `gui/${uid}` : 'gui';
+}
+
+function restartLaunchAgentIfInstalled() {
+  if (process.platform !== 'darwin') {
+    return false;
+  }
+  const domain = launchdDomain();
+  const serviceName = `${domain}/${launchdLabel}`;
+  const printResult = spawnSync('launchctl', ['print', serviceName], {
+    encoding: 'utf8'
+  });
+  if (printResult.status !== 0) {
+    return false;
+  }
+  const output = `${printResult.stdout || ''}\n${printResult.stderr || ''}`;
+  if (!output.includes(root) || !output.includes('scripts/run-server.mjs')) {
+    return false;
+  }
+  const result = spawnSync('launchctl', ['kickstart', '-k', serviceName], {
+    encoding: 'utf8'
+  });
+  if (result.status !== 0) {
+    const detail = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+    throw new Error(`launchctl kickstart failed${detail ? `:\n${detail}` : ''}`);
+  }
+  console.log(`CodexMobile is managed by launchd; restarted ${launchdLabel}.`);
+  console.log(`Logs: ${path.join(logDir, 'launchd.out.log')}`);
+  return true;
+}
+
 function listenerPidsForPort(value) {
   if (process.platform === 'win32') {
     return [];
@@ -147,6 +181,10 @@ async function stopExistingServer() {
     }
   }
   console.log(`Force-stopped existing CodexMobile server on port ${port}: ${pids.join(', ')}`);
+}
+
+if (restartLaunchAgentIfInstalled()) {
+  process.exit(0);
 }
 
 await stopExistingServer();

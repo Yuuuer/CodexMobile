@@ -45,6 +45,11 @@ export function shouldRefreshDesktopThreadForPayload(payload = {}) {
   return payload.type === 'status-update' && payload.kind === 'turn' && ['completed', 'failed'].includes(payload.status);
 }
 
+export function shouldRefreshCurrentSessionAfterReconnect(session = null) {
+  const sessionId = String(session?.id || '').trim();
+  return Boolean(sessionId && !sessionId.startsWith('draft-'));
+}
+
 export function useAppWebSocket({
   useEffect,
   authenticated,
@@ -82,6 +87,22 @@ export function useAppWebSocket({
 
     let stopped = false;
     let reconnectTimer = null;
+    let reconnectingAfterDrop = false;
+
+    async function refreshCurrentSessionAfterReconnect() {
+      const project = selectedProjectRef.current;
+      const session = selectedSessionRef.current;
+      if (!project?.id || !shouldRefreshCurrentSessionAfterReconnect(session)) {
+        return;
+      }
+      await apiFetch('/api/sync', { method: 'POST' }).catch(() => null);
+      await loadSessions(project, {
+        chooseLatest: false,
+        preferredSessionId: session.id,
+        preserveSelection: true,
+        silent: true
+      });
+    }
 
     const connect = () => {
       setConnectionState('connecting');
@@ -92,6 +113,7 @@ export function useAppWebSocket({
       ws.onclose = () => {
         setConnectionState('disconnected');
         if (!stopped) {
+          reconnectingAfterDrop = true;
           reconnectTimer = window.setTimeout(connect, 1200);
         }
       };
@@ -99,9 +121,14 @@ export function useAppWebSocket({
       ws.onmessage = (event) => {
         const payload = JSON.parse(event.data);
         if (payload.type === 'connected') {
+          const forceClearLocalRuns = reconnectingAfterDrop;
+          reconnectingAfterDrop = false;
           setStatus(payload.status || defaultStatus);
           setConnectionState(payload.status?.connected ? 'connected' : 'disconnected');
-          syncActiveRunsFromStatus(payload.status || defaultStatus);
+          syncActiveRunsFromStatus(payload.status || defaultStatus, { forceClear: forceClearLocalRuns });
+          if (payload.status?.connected) {
+            refreshCurrentSessionAfterReconnect().catch(() => null);
+          }
           return;
         }
         if (payload.type === 'chat-started') {

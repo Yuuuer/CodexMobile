@@ -26,6 +26,7 @@ import {
   emptyContextStatus,
   hasRunningKey,
   isDraftSession,
+  isLiveThreadRuntime,
   reconcileThreadRuntimeWithSessions,
   runningByIdWithSelectedActivity,
   selectedRunKeys,
@@ -133,11 +134,10 @@ export default function App() {
 
   const selectedRuntime = selectedRunKeys(selectedSession)
     .map((key) => threadRuntimeById[key])
-    .find(Boolean) || null;
+    .find(isLiveThreadRuntime) || null;
   const running =
     hasRunningKey(runningById, selectedRunKeys(selectedSession)) ||
-    selectedRuntime?.status === 'running' ||
-    selectedSession?.runtime?.status === 'running';
+    selectedRuntime?.status === 'running';
   const hasRunningActivity = useMemo(
     () =>
       messages.some(

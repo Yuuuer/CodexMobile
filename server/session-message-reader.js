@@ -316,6 +316,17 @@ function applyContextEntry(state, entry, sessionId) {
     return;
   }
 
+  if (
+    entry.type === 'response_item' &&
+    payload.type === 'message' &&
+    payload.role === 'assistant' &&
+    payload.phase !== 'commentary'
+  ) {
+    clearRuntimeForTurn(state, state.runtime?.turnId);
+    state.updatedAt = timestamp;
+    return;
+  }
+
   if (entry.type === 'compacted') {
     state.autoCompactDetected = true;
     state.autoCompactLastAt = timestamp;

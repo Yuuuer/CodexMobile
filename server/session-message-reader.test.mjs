@@ -113,6 +113,48 @@ test('rollout context state exposes running desktop runtime until task completio
   }
 });
 
+test('rollout context state clears runtime after final assistant message without task_complete', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'codexmobile-runtime-final-message-'));
+  try {
+    const rolloutPath = path.join(dir, 'rollout.jsonl');
+    await fs.writeFile(rolloutPath, [
+      JSON.stringify({
+        timestamp: '2026-05-08T01:00:00.000Z',
+        type: 'turn_context',
+        payload: { turn_id: 'turn-1', model: 'gpt-5.5' }
+      }),
+      JSON.stringify({
+        timestamp: '2026-05-08T01:00:02.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'message',
+          role: 'assistant',
+          phase: 'commentary',
+          content: [{ type: 'output_text', text: '正在处理。' }]
+        }
+      })
+    ].join('\n'));
+
+    const running = await readRolloutContextState(rolloutPath, 'session-1');
+    assert.equal(running.runtime.status, 'running');
+
+    await fs.appendFile(rolloutPath, `\n${JSON.stringify({
+      timestamp: '2026-05-08T01:00:10.000Z',
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'output_text', text: '完成了。' }]
+      }
+    })}`);
+
+    const completed = await readRolloutContextState(rolloutPath, 'session-1');
+    assert.equal(completed.runtime, null);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('session message reader merges raw and collaboration activities only when requested', async () => {
   const calls = [];
   const messages = [

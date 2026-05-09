@@ -12,6 +12,7 @@ import { mergeContextStatus } from './context-status.js';
 import {
   hasRunningKey,
   isDraftSession,
+  isLiveThreadRuntime,
   selectedRunKeys,
   sessionMessagesApiPath
 } from './session-utils.js';
@@ -51,10 +52,8 @@ export function useSessionLivePolling({
       );
       const selectedRunRuntime = selectedRunKeys(selectedSessionRef.current || selectedSession)
         .map((key) => threadRuntimeById?.[key])
-        .find(Boolean) || null;
+        .find(isLiveThreadRuntime) || null;
       const hasDesktopThreadRuntime =
-        selectedSessionRef.current?.runtime?.status === 'running' ||
-        selectedSession.runtime?.status === 'running' ||
         selectedRunRuntime?.source === 'desktop-thread' ||
         selectedRunRuntime?.source === 'desktop-ipc' ||
         selectedRunRuntime?.source === 'headless-local';

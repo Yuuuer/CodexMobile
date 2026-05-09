@@ -137,6 +137,38 @@ test('file route handler searches project files and preserves project not found 
   assert.deepEqual(JSON.parse(missingRes.body), { error: 'Project not found' });
 });
 
+test('file route handler accepts local file URLs with source filename path segment', async () => {
+  const calls = [];
+  const handler = createFileRouteHandler({
+    getProject: () => null,
+    staticService: {
+      async sendLocalImage() {
+        throw new Error('unexpected');
+      },
+      async sendLocalFile(req, res, url) {
+        calls.push(url.pathname);
+        res.writeHead(200, {});
+        res.end('ok');
+      }
+    },
+    saveUpload: async () => ({ name: 'file.txt' }),
+    uploadRoot: '/tmp/uploads',
+    maxUploadBytes: 100
+  });
+
+  const res = createResponse();
+  assert.equal(
+    await handler(
+      createRequest('GET'),
+      res,
+      new URL('http://local/api/local-file/%E9%9D%92%E7%94%9C.pdf?path=%2Ftmp%2F%E9%9D%92%E7%94%9C.pdf')
+    ),
+    true
+  );
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(calls, ['/api/local-file/%E9%9D%92%E7%94%9C.pdf']);
+});
+
 test('session route handler renames sessions and broadcasts refresh events', async () => {
   const broadcasts = [];
   const handler = createSessionRouteHandler({

@@ -86,6 +86,17 @@ function userMessageMetadataForSendMode(sendMode = 'start') {
     : {};
 }
 
+async function syncDesktopFollowerCollaborationMode({
+  selectedSessionId,
+  collaborationMode,
+  setDesktopFollowerCollaborationMode
+}) {
+  if (!setDesktopFollowerCollaborationMode) {
+    return;
+  }
+  await setDesktopFollowerCollaborationMode(selectedSessionId, collaborationMode || null);
+}
+
 export async function sendViaDesktopIpc({
   bridge,
   project,
@@ -137,37 +148,16 @@ export async function sendViaDesktopIpc({
     attachments: []
   };
 
-  rememberTurn(turnId, {
-    projectId: project.id,
-    projectPath: project.path,
-    sessionId: selectedSessionId,
-    previousSessionId: selectedSessionId,
-    draftSessionId,
-    status: 'running',
-    label: sendMode === 'steer' ? '已发送到当前任务' : '已交给桌面端处理',
-    startedAt: now
-  });
-  broadcast({
-    type: 'user-message',
-    sessionId: selectedSessionId,
-    projectId: project.id,
-    message: {
-      id: `local-${Date.now()}`,
-      role: 'user',
-      content: visibleMessage,
-      ...userMessageMetadataForSendMode(sendMode),
-      timestamp: now
-    }
-  });
-
   async function attemptDesktopFollowerTurn() {
     if (sendMode === 'steer') {
       if (setDesktopFollowerModelAndReasoning) {
         await setDesktopFollowerModelAndReasoning(selectedSessionId, model || null, reasoningEffort || null);
       }
-      if (collaborationMode && setDesktopFollowerCollaborationMode) {
-        await setDesktopFollowerCollaborationMode(selectedSessionId, collaborationMode);
-      }
+      await syncDesktopFollowerCollaborationMode({
+        selectedSessionId,
+        collaborationMode,
+        setDesktopFollowerCollaborationMode
+      });
       result = await steerDesktopFollowerTurn(selectedSessionId, {
         input,
         attachments: [],
@@ -188,9 +178,11 @@ export async function sendViaDesktopIpc({
       if (setDesktopFollowerModelAndReasoning) {
         await setDesktopFollowerModelAndReasoning(selectedSessionId, model || null, reasoningEffort || null);
       }
-      if (collaborationMode && setDesktopFollowerCollaborationMode) {
-        await setDesktopFollowerCollaborationMode(selectedSessionId, collaborationMode);
-      }
+      await syncDesktopFollowerCollaborationMode({
+        selectedSessionId,
+        collaborationMode,
+        setDesktopFollowerCollaborationMode
+      });
       result = await startDesktopFollowerTurn(selectedSessionId, baseTurnStartParams);
     }
     return result;
@@ -221,6 +213,28 @@ export async function sendViaDesktopIpc({
   }
 
   const appTurnId = result?.result?.turn?.id || result?.turn?.id || turnId;
+  rememberTurn(turnId, {
+    projectId: project.id,
+    projectPath: project.path,
+    sessionId: selectedSessionId,
+    previousSessionId: selectedSessionId,
+    draftSessionId,
+    status: 'running',
+    label: sendMode === 'steer' ? '已发送到当前任务' : '已交给桌面端处理',
+    startedAt: now
+  });
+  broadcast({
+    type: 'user-message',
+    sessionId: selectedSessionId,
+    projectId: project.id,
+    message: {
+      id: `local-${Date.now()}`,
+      role: 'user',
+      content: visibleMessage,
+      ...userMessageMetadataForSendMode(sendMode),
+      timestamp: now
+    }
+  });
   broadcast({
     type: 'status-update',
     source: bridge?.mode || 'desktop-ipc',

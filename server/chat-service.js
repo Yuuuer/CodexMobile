@@ -84,6 +84,17 @@ export function createChatService({
     );
   }
 
+  function activeLocalRunForAbort({ turnId = '', sessionId = '', previousSessionId = '' } = {}) {
+    const ids = new Set([turnId, sessionId, previousSessionId].map((value) => String(value || '').trim()).filter(Boolean));
+    if (!ids.size) {
+      return null;
+    }
+    return getActiveRuns().find((run) => (
+      run?.status === 'running' &&
+      [run.turnId, run.sessionId, run.previousSessionId].some((value) => ids.has(String(value || '').trim()))
+    )) || null;
+  }
+
   function emitJobEvent(job, payload) {
     const enriched = { projectId: job.project.id, ...payload };
     rememberTurnEvent(enriched);
@@ -229,9 +240,11 @@ export function createChatService({
     });
     const queueKey = resolveConversationKey(selectedSessionId, draftSessionId, requestedSessionId);
     const existingConversationState = getConversationQueue(queueKey);
+    let selectedSessionResolvedFromBackgroundAlias = false;
     if (!selectedSessionId && draftSessionId && existingConversationState.sessionId) {
       selectedSessionId = existingConversationState.sessionId;
       conversationSessionId = selectedSessionId;
+      selectedSessionResolvedFromBackgroundAlias = true;
     }
     const shouldHoldInLocalQueue =
       sendMode === 'queue' &&
@@ -309,10 +322,18 @@ export function createChatService({
           });
           return result;
         } catch (error) {
-          if (error?.code !== 'CODEXMOBILE_DESKTOP_THREAD_OWNER_UNAVAILABLE' || !desktopIpcCanUseBackgroundFallback(bridge)) {
+          const canFallBackToBackground =
+            error?.code === 'CODEXMOBILE_DESKTOP_THREAD_OWNER_UNAVAILABLE' &&
+            desktopIpcCanUseBackgroundFallback(bridge);
+          if (!canFallBackToBackground) {
             throw error;
           }
-          bridge = backgroundFallbackBridge(bridge);
+          bridge = backgroundFallbackBridge(
+            bridge,
+            selectedSessionResolvedFromBackgroundAlias
+              ? undefined
+              : '桌面端当前没有接管这个线程，已改用后台 Codex 继续执行。'
+          );
         }
       }
     }
@@ -449,6 +470,32 @@ export function createChatService({
     const sessionId = String(body.sessionId || '').trim();
     const previousSessionId = String(body.previousSessionId || '').trim();
     console.log(`[chat] abort request remote=${remoteAddress} turn=${turnId} session=${sessionId}`);
+    const localRun = activeLocalRunForAbort({ turnId, sessionId, previousSessionId });
+    if (localRun) {
+      const aborted = abortCodexTurn(localRun.turnId || turnId || sessionId);
+      const completedAt = new Date().toISOString();
+      const payload = {
+        type: 'chat-aborted',
+        source: 'headless-local',
+        projectId: body.projectId || undefined,
+        sessionId: sessionId || localRun.sessionId || undefined,
+        previousSessionId: previousSessionId || localRun.previousSessionId || undefined,
+        turnId: turnId || localRun.turnId || sessionId,
+        completedAt,
+        timestamp: completedAt
+      };
+      rememberTurn(payload.turnId, {
+        projectId: payload.projectId,
+        sessionId: payload.sessionId,
+        previousSessionId: payload.previousSessionId,
+        source: 'headless-local',
+        status: 'aborted',
+        label: '已中止',
+        completedAt
+      });
+      broadcast(payload);
+      return Boolean(aborted || turnId || sessionId);
+    }
     const desktopRun = desktopTurnMonitor.getRun(turnId) || desktopTurnMonitor.getRun(sessionId);
     if (desktopRun) {
       if (!interruptDesktopFollowerTurn) {

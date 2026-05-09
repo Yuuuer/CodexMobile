@@ -117,6 +117,7 @@ function PlanRequestMessage({ message, onImplementPlan, onAdjustPlan }) {
     setSubmittingAdjust(false);
     if (ok) {
       setAdjustment('');
+      setCompleted(true);
     }
   }
 

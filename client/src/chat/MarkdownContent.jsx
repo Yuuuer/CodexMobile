@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
-import { isLocalImageSource } from '../app/session-utils.js';
+import { getToken } from '../api.js';
+import { isLocalFileSource, isLocalImageSource, localFilePreviewPath } from '../app/session-utils.js';
 import { copyTextToClipboard } from '../utils/clipboard.js';
 import { GeneratedImage } from './ImagePreview.jsx';
 
@@ -110,6 +111,9 @@ function normalizeInlineHref(value) {
   if (!raw) {
     return '';
   }
+  if (isLocalFileSource(raw)) {
+    return localFilePreviewPath(raw, getToken());
+  }
   if (/^https?:\/\//i.test(raw) || /^mailto:/i.test(raw) || raw.startsWith('/') || raw.startsWith('#')) {
     return raw;
   }
@@ -118,6 +122,9 @@ function normalizeInlineHref(value) {
 
 function markdownUrlTransform(url, key) {
   const raw = String(url || '').trim();
+  if (key === 'href' && isLocalFileSource(raw)) {
+    return raw;
+  }
   if (key === 'src' && /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(raw)) {
     return raw;
   }

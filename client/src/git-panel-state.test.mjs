@@ -22,20 +22,25 @@ test('gitSafetyWarnings reports large truncated working trees clearly', () => {
   ]);
 });
 
-test('gitActionBlockReason blocks mobile git actions on non-codex branches', () => {
+test('gitActionBlockReason treats non-codex branches as warnings, not blocks', () => {
   assert.equal(
     gitActionBlockReason({ branch: 'main', canCommit: true, fileCount: 1 }, 'commit'),
-    '移动端只允许在 codex/ 分支执行提交或推送'
+    ''
   );
 });
 
-test('gitActionBlockReason blocks huge dirty worktrees before commit or push', () => {
+test('gitActionBlockReason treats huge dirty worktrees as warnings, not blocks', () => {
   assert.equal(
     gitActionBlockReason({ branch: 'codex/git-fix', canCommit: true, fileCount: 501 }, 'push'),
-    '改动文件过多，请先在桌面端确认范围'
+    ''
   );
 });
 
 test('gitActionBlockReason allows focused codex branch actions', () => {
   assert.equal(gitActionBlockReason({ branch: 'codex/git-fix', canCommit: true, fileCount: 3 }, 'commit'), '');
+});
+
+test('gitActionBlockReason still blocks missing branches and empty commits', () => {
+  assert.equal(gitActionBlockReason({ canCommit: true }, 'push'), '当前不在有效 Git 分支上');
+  assert.equal(gitActionBlockReason({ branch: 'main', canCommit: false }, 'commit'), '没有可提交的改动');
 });

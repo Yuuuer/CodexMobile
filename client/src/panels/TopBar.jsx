@@ -1,4 +1,4 @@
-import { Bell, Check, Copy, GitBranch, GitCommitHorizontal, Menu, MoreHorizontal, UploadCloud, Wifi } from 'lucide-react';
+import { Bell, Check, Copy, FileText, GitBranch, GitCommitHorizontal, Menu, MoreHorizontal, RefreshCw, UploadCloud, Wifi } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { copyTextToClipboard } from '../utils/clipboard.js';
 import { isDraftSession } from '../app/session-utils.js';
@@ -126,6 +126,22 @@ export function TopBar({
                 <GitBranch size={16} />
                 <span>Git</span>
               </div>
+              <button type="button" role="menuitem" onClick={() => handleGitAction('status')} disabled={gitDisabled}>
+                <FileText size={16} />
+                <span>查看状态</span>
+              </button>
+              <button type="button" role="menuitem" onClick={() => handleGitAction('diff')} disabled={gitDisabled}>
+                <FileText size={16} />
+                <span>查看 diff</span>
+              </button>
+              <button type="button" role="menuitem" onClick={() => handleGitAction('pull')} disabled={gitDisabled}>
+                <RefreshCw size={16} />
+                <span>拉取</span>
+              </button>
+              <button type="button" role="menuitem" onClick={() => handleGitAction('sync')} disabled={gitDisabled}>
+                <RefreshCw size={16} />
+                <span>同步</span>
+              </button>
               <button type="button" role="menuitem" onClick={() => handleGitAction('commit')} disabled={gitDisabled}>
                 <GitCommitHorizontal size={16} />
                 <span>提交</span>
@@ -134,9 +150,13 @@ export function TopBar({
                 <UploadCloud size={16} />
                 <span>推送</span>
               </button>
-              <button type="button" role="menuitem" onClick={() => handleGitAction('branch')} disabled={gitDisabled || !projectId}>
+              <button type="button" role="menuitem" onClick={() => handleGitAction('commit-push')} disabled={gitDisabled}>
+                <UploadCloud size={16} />
+                <span>提交并推送</span>
+              </button>
+              <button type="button" role="menuitem" onClick={() => handleGitAction('branches')} disabled={gitDisabled || !projectId}>
                 <GitBranch size={16} />
-                <span>创建分支</span>
+                <span>分支管理</span>
               </button>
             </div>
           ) : null}

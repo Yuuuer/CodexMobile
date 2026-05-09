@@ -80,3 +80,45 @@ test('git route handler reads branch creation bodies', async () => {
     branch: 'codex/new-branch'
   });
 });
+
+test('git route handler serves pull, sync, and commit-push actions', async () => {
+  const calls = [];
+  const handler = createGitRouteHandler({
+    gitService: {
+      async pull(projectId) {
+        calls.push(['pull', projectId]);
+        return { output: 'Already up to date.' };
+      },
+      async sync(projectId) {
+        calls.push(['sync', projectId]);
+        return { output: 'synced' };
+      },
+      async commitPush(projectId, message) {
+        calls.push(['commit-push', projectId, message]);
+        return { hash: 'abc123', output: 'pushed' };
+      }
+    }
+  });
+
+  for (const [path, body] of [
+    ['/api/git/pull', { projectId: 'project-1' }],
+    ['/api/git/sync', { projectId: 'project-1' }],
+    ['/api/git/commit-push', { projectId: 'project-1', message: '更新 Git' }]
+  ]) {
+    const req = createRequest('POST');
+    const res = createResponse();
+    const promise = handler(req, res, new URL(`http://localhost${path}`));
+    req.emit('data', JSON.stringify(body));
+    req.emit('end');
+    const handled = await promise;
+    assert.equal(handled, true);
+    assert.equal(res.statusCode, 200);
+    assert.equal(JSON.parse(res.body).success, true);
+  }
+
+  assert.deepEqual(calls, [
+    ['pull', 'project-1'],
+    ['sync', 'project-1'],
+    ['commit-push', 'project-1', '更新 Git']
+  ]);
+});

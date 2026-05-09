@@ -28,11 +28,10 @@ async function writeIndexFile(sessions) {
     .filter((session) => session?.id && (session?.projectPath || session?.projectless))
     .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
     .slice(0, MAX_SESSIONS);
-  await fs.writeFile(
-    INDEX_PATH,
-    JSON.stringify({ version: 1, sessions: trimmed }, null, 2),
-    'utf8'
-  );
+  const payload = JSON.stringify({ version: 1, sessions: trimmed }, null, 2);
+  const tempPath = `${INDEX_PATH}.${process.pid}.${Date.now()}.tmp`;
+  await fs.writeFile(tempPath, payload, 'utf8');
+  await fs.rename(tempPath, INDEX_PATH);
 }
 
 function fallbackTitle(title, summary) {

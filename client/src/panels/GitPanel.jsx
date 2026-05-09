@@ -1,6 +1,7 @@
 import { Check, ChevronLeft, Copy, ExternalLink, FileText, FolderGit2, GitBranch, GitCommitHorizontal, GitPullRequest, Loader2, Plus, RefreshCw, UploadCloud, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../api.js';
+import { gitActionRequestConfig } from '../git-panel-actions.js';
 import { gitActionBlockReason, gitChangedFileCount, gitSafetyWarnings } from '../git-panel-state.js';
 import { copyTextToClipboard } from '../utils/clipboard.js';
 
@@ -8,7 +9,9 @@ function gitActionTitle(action) {
   const titles = {
     branches: 'Git 分支',
     branch: '创建分支',
+    status: 'Git 状态',
     diff: 'Git Diff',
+    pull: '拉取',
     sync: '同步',
     commit: '提交',
     push: '推送',
@@ -32,6 +35,7 @@ function gitBranchDraft(project) {
 
 export function GitPanel({ open, action, project, onClose, onToast }) {
   const projectId = project?.id || '';
+  const [panelAction, setPanelAction] = useState(action || 'status');
   const [status, setStatus] = useState(null);
   const [branches, setBranches] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -39,19 +43,21 @@ export function GitPanel({ open, action, project, onClose, onToast }) {
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const [diff, setDiff] = useState(null);
+  const [diffLoaded, setDiffLoaded] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
   const [branchName, setBranchName] = useState('');
   const [baseBranch, setBaseBranch] = useState('');
   const [copiedDraft, setCopiedDraft] = useState(false);
 
-  const title = gitActionTitle(action);
+  const activeAction = panelAction || action || 'status';
+  const title = gitActionTitle(activeAction);
   const fileCount = gitChangedFileCount(status || {});
   const safetyWarnings = gitSafetyWarnings(status || {});
-  const blockReason = status ? gitActionBlockReason(status, action) : '';
+  const blockReason = status ? gitActionBlockReason(status, activeAction) : '';
   const branchList = Array.isArray(branches?.branches) ? branches.branches : [];
   const branchControlsLimited = Boolean(branches?.limited);
   const defaultBaseBranch = branches?.defaultBranch || baseBranch || 'main';
-  const prDraft = result?.draft || (action === 'pr-draft' ? result : null);
+  const prDraft = result?.draft || (activeAction === 'pr-draft' ? result : null);
 
   const loadStatus = useCallback(async () => {
     if (!open || !projectId) return null;
@@ -104,6 +110,7 @@ export function GitPanel({ open, action, project, onClose, onToast }) {
     } catch (loadError) {
       setError(loadError.message || '读取 Git diff 失败');
     } finally {
+      setDiffLoaded(true);
       setBusy(false);
       setBusyAction('');
     }
@@ -123,23 +130,31 @@ export function GitPanel({ open, action, project, onClose, onToast }) {
     if (!open) return;
     setResult(null);
     setDiff(null);
+    setDiffLoaded(false);
     setError('');
     setCopiedDraft(false);
     setCommitMessage('');
     setBranchName('');
     setBaseBranch('');
+    setPanelAction(action || 'status');
     refreshAll();
   }, [open, action, projectId, refreshAll]);
 
   useEffect(() => {
-    if (open && action === 'diff' && !diff && !busy) {
+    if (open && activeAction === 'diff' && !diffLoaded && !busy) {
       loadDiff();
     }
-  }, [open, action, diff, busy, loadDiff]);
+  }, [open, activeAction, diffLoaded, busy, loadDiff]);
 
-  async function runGitAction(nextAction = action, extraBody = {}) {
+  function selectPanelAction(nextAction) {
+    setPanelAction(nextAction);
+    setError('');
+    setResult(null);
+  }
+
+  async function runGitAction(nextAction = activeAction, extraBody = {}) {
     if (!projectId || busy) return;
-    if (!status && (nextAction === 'commit' || nextAction === 'commit-push' || nextAction === 'push' || nextAction === 'sync')) {
+    if (!status && (nextAction === 'commit' || nextAction === 'commit-push' || nextAction === 'pull' || nextAction === 'push' || nextAction === 'sync')) {
       setError('Git 状态尚未读取完成');
       return;
     }
@@ -172,31 +187,15 @@ export function GitPanel({ open, action, project, onClose, onToast }) {
   }
 
   async function requestGitAction(nextAction, extraBody) {
-    if (nextAction === 'commit') {
-      return apiFetch('/api/git/commit', { method: 'POST', body: { projectId, message: commitMessage }, timeoutMs: 70_000 });
-    }
-    if (nextAction === 'commit-push') {
-      return apiFetch('/api/git/commit-push', { method: 'POST', body: { projectId, message: commitMessage }, timeoutMs: 130_000 });
-    }
-    if (nextAction === 'push') {
-      return apiFetch('/api/git/push', { method: 'POST', body: { projectId }, timeoutMs: 130_000 });
-    }
-    if (nextAction === 'sync') {
-      return apiFetch('/api/git/sync', { method: 'POST', body: { projectId }, timeoutMs: 130_000 });
-    }
-    if (nextAction === 'branch') {
-      return apiFetch('/api/git/branch', { method: 'POST', body: { projectId, branchName } });
-    }
-    if (nextAction === 'checkout') {
-      return apiFetch('/api/git/checkout', { method: 'POST', body: { projectId, branch: extraBody.branch } });
-    }
-    if (nextAction === 'worktree') {
-      return apiFetch('/api/git/worktree', { method: 'POST', body: { projectId, branchName, baseBranch: baseBranch || defaultBaseBranch } });
-    }
-    if (nextAction === 'pr-draft') {
-      return apiFetch('/api/git/pr-draft', { method: 'POST', body: { projectId, baseBranch: baseBranch || defaultBaseBranch } });
-    }
-    return null;
+    const request = gitActionRequestConfig(nextAction, {
+      projectId,
+      commitMessage,
+      branchName,
+      baseBranch,
+      defaultBaseBranch,
+      extraBody
+    });
+    return request ? apiFetch(request.path, request.options) : null;
   }
 
   async function copyDraft() {
@@ -230,8 +229,9 @@ export function GitPanel({ open, action, project, onClose, onToast }) {
 
       <div className="docs-panel-body git-panel-body">
         <GitStatusSummary status={status} fileCount={fileCount} warnings={safetyWarnings} onRefresh={refreshAll} busy={busy} />
+        <GitActionLauncher activeAction={activeAction} onSelect={selectPanelAction} disabled={busy} />
 
-        {action === 'branches' ? (
+        {activeAction === 'branches' ? (
           <BranchSheet
             branches={branchList}
             branchName={branchName}
@@ -247,7 +247,7 @@ export function GitPanel({ open, action, project, onClose, onToast }) {
           />
         ) : null}
 
-        {action === 'branch' ? (
+        {activeAction === 'branch' ? (
           <CreateBranchSheet
             branchName={branchName}
             setBranchName={setBranchName}
@@ -258,28 +258,32 @@ export function GitPanel({ open, action, project, onClose, onToast }) {
           />
         ) : null}
 
-        {action === 'diff' ? (
+        {activeAction === 'diff' ? (
           <DiffSheet diff={diff} busy={busyAction === 'diff'} onRefresh={loadDiff} />
         ) : null}
 
-        {action === 'commit' || action === 'commit-push' ? (
+        {activeAction === 'commit' || activeAction === 'commit-push' ? (
           <CommitSheet
-            action={action}
+            action={activeAction}
             commitMessage={commitMessage}
             setCommitMessage={setCommitMessage}
             canCommit={canCommit}
             busy={busy}
             busyAction={busyAction}
-            onCommit={() => runGitAction(action)}
+            onCommit={() => runGitAction(activeAction)}
             blockReason={blockReason}
           />
         ) : null}
 
-        {action === 'sync' || action === 'push' ? (
-          <ActionProgress action={action} busy={busy} result={result} blockReason={blockReason} onRun={() => runGitAction(action)} />
+        {activeAction === 'status' ? (
+          <StatusFileList status={status} />
         ) : null}
 
-        {action === 'pr-draft' ? (
+        {activeAction === 'pull' || activeAction === 'sync' || activeAction === 'push' ? (
+          <ActionProgress action={activeAction} busy={busy} result={result} blockReason={blockReason} onRun={() => runGitAction(activeAction)} />
+        ) : null}
+
+        {activeAction === 'pr-draft' ? (
           <PrDraftSheet
             baseBranch={baseBranch || defaultBaseBranch}
             setBaseBranch={setBaseBranch}
@@ -293,8 +297,60 @@ export function GitPanel({ open, action, project, onClose, onToast }) {
         ) : null}
 
         {error ? <div className="docs-panel-error">{error}</div> : null}
-        <GitResult result={result} action={action} />
+        <GitResult result={result} action={activeAction} />
       </div>
+    </section>
+  );
+}
+
+function GitActionLauncher({ activeAction, onSelect, disabled }) {
+  const actions = [
+    ['status', FileText, '状态'],
+    ['diff', FileText, 'Diff'],
+    ['pull', RefreshCw, 'Pull'],
+    ['sync', RefreshCw, 'Sync'],
+    ['commit', GitCommitHorizontal, 'Commit'],
+    ['push', UploadCloud, 'Push'],
+    ['commit-push', UploadCloud, 'Commit+Push'],
+    ['branches', GitBranch, '分支']
+  ];
+  return (
+    <nav className="git-action-launcher" aria-label="Git 操作">
+      {actions.map(([nextAction, Icon, label]) => (
+        <button
+          key={nextAction}
+          type="button"
+          className={activeAction === nextAction ? 'is-active' : ''}
+          onClick={() => onSelect(nextAction)}
+          disabled={disabled && activeAction !== nextAction}
+        >
+          <Icon size={14} />
+          <span>{label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function StatusFileList({ status }) {
+  const files = Array.isArray(status?.files) ? status.files : [];
+  return (
+    <section className="git-action-card">
+      <div className="git-section-head">
+        <strong>状态</strong>
+        <span>{status?.clean ? '暂无改动' : `${status?.fileCount || files.length} 个改动文件`}</span>
+      </div>
+      {files.length ? (
+        <div className="git-file-list">
+          {files.map((file) => (
+            <div key={`${file.status}:${file.path}`}>
+              <code>{file.status}</code>
+              <span>{file.path}</span>
+            </div>
+          ))}
+        </div>
+      ) : <p className="git-help-text">工作区当前没有可展示的改动文件。</p>}
+      {status?.filesTruncated ? <small className="git-diff-note">status 仅展示部分文件，Git 操作仍按真实工作区执行。</small> : null}
     </section>
   );
 }

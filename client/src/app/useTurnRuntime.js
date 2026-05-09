@@ -14,6 +14,7 @@ import {
   payloadRunKeys,
   sessionMessagesApiPath,
   shouldClearRuntimeWhenNoActiveRuns,
+  shouldDropRunningActivityMissingFromActiveRuns,
   shouldDropRunningActivityWhenNoActiveRuns,
   shouldPreserveLocalRunsFromStatus
 } from './session-utils.js';
@@ -164,11 +165,12 @@ export function useTurnRuntime({
     });
   }
 
-  const syncActiveRunsFromStatus = useCallback((nextStatus) => {
+  const syncActiveRunsFromStatus = useCallback((nextStatus, options = {}) => {
     const activeRuns = Array.isArray(nextStatus?.activeRuns) ? nextStatus.activeRuns : [];
     const shouldPreserveLocalRuns = shouldPreserveLocalRunsFromStatus({
       activePollCount: activePollsRef.current.size,
-      turnRefreshTimerCount: turnRefreshTimersRef.current.size
+      turnRefreshTimerCount: turnRefreshTimersRef.current.size,
+      forceClear: Boolean(options.forceClear)
     });
 
     if (!activeRuns.length) {
@@ -198,8 +200,10 @@ export function useTurnRuntime({
 
     const nextRunning = {};
     const nextRuntime = {};
+    const activeRunKeys = new Set();
     for (const run of activeRuns) {
       for (const key of payloadRunKeys(run)) {
+        activeRunKeys.add(key);
         nextRunning[key] = true;
         nextRuntime[key] = {
           status: 'running',
@@ -220,6 +224,11 @@ export function useTurnRuntime({
         : { ...externalThreadRuntimeById(current), ...nextRuntime };
       return next;
     });
+    if (!shouldPreserveLocalRuns) {
+      setMessages((current) =>
+        current.filter((message) => !shouldDropRunningActivityMissingFromActiveRuns(message, activeRunKeys))
+      );
+    }
   }, [activePollsRef, runningByIdRef, setMessages, setRunningById, setThreadRuntimeById, turnRefreshTimersRef]);
 
   function payloadMatchesCurrentConversation(payload) {

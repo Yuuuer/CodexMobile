@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
@@ -53,6 +53,55 @@ async function runGit(cwd, args, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   } catch (error) {
     throw gitError(error);
   }
+}
+
+async function runGitCapped(cwd, args, { timeoutMs = DEFAULT_TIMEOUT_MS, maxChars = MAX_DIFF_CHARS } = {}) {
+  return new Promise((resolve, reject) => {
+    const limit = Math.max(1000, Number(maxChars) || MAX_DIFF_CHARS);
+    const child = spawn('git', args, { cwd, env: process.env });
+    let stdout = '';
+    let stderr = '';
+    let stdoutBytes = 0;
+    let truncated = false;
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill('SIGTERM');
+      const error = serviceError('Git diff 读取超时', 504);
+      reject(error);
+    }, timeoutMs);
+
+    child.stdout.on('data', (chunk) => {
+      const text = String(chunk || '');
+      stdoutBytes += Buffer.byteLength(chunk);
+      if (stdout.length < limit) {
+        stdout += text.slice(0, limit - stdout.length);
+      }
+      if (stdout.length >= limit) {
+        truncated = true;
+      }
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk || '');
+    });
+    child.on('error', (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      reject(gitError(error));
+    });
+    child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (code) {
+        reject(gitError({ stdout, stderr: stderr || `git exited with code ${code}` }));
+        return;
+      }
+      resolve({ stdout, stderr, truncated, originalLength: stdoutBytes });
+    });
+  });
 }
 
 export function parseGitStatusShort(output = '', { maxFiles = MAX_STATUS_FILES } = {}) {
@@ -140,11 +189,8 @@ function sanitizeExistingBranchName(value = '') {
 }
 
 function ensureMobileSafeGitAction(current = {}) {
-  if (!current.branch || !String(current.branch).startsWith('codex/')) {
-    throw serviceError('移动端只允许在 codex/ 分支执行提交或推送', 409);
-  }
-  if (current.filesTruncated || Number(current.fileCount || 0) > MAX_STATUS_FILES) {
-    throw serviceError('改动文件过多，请先在桌面端确认范围', 409);
+  if (!current.branch) {
+    throw serviceError('当前不在有效分支上', 409);
   }
 }
 
@@ -291,11 +337,17 @@ export function createGitService({ getProject, runner = runGit } = {}) {
 
   async function diff(projectId) {
     const cwd = await projectCwd(projectId);
-    const [summary, patch] = await Promise.all([
-      runner(cwd, ['diff', 'HEAD', '--stat']),
-      runner(cwd, ['diff', 'HEAD', '--'])
-    ]);
-    const truncated = truncateGitOutput(patch.stdout);
+    const summary = await runner(cwd, ['diff', 'HEAD', '--stat']);
+    const patch = runner === runGit
+      ? await runGitCapped(cwd, ['diff', 'HEAD', '--'], { timeoutMs: 30_000, maxChars: MAX_DIFF_CHARS })
+      : await runner(cwd, ['diff', 'HEAD', '--']);
+    const truncated = patch.truncated
+      ? {
+          text: `${patch.stdout}\n\n[diff truncated: ${Math.max(0, Number(patch.originalLength || 0) - patch.stdout.length)} bytes hidden]`,
+          truncated: true,
+          originalLength: patch.originalLength
+        }
+      : truncateGitOutput(patch.stdout);
     return {
       summary: summary.stdout.trim(),
       patch: truncated.text,

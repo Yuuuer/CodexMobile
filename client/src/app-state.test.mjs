@@ -5,6 +5,8 @@ import { applyPwaTheme } from './app/pwa-theme.js';
 import {
   createDraftSession,
   externalThreadRuntimeById,
+  localFileApiPath,
+  localFilePreviewPath,
   payloadRunKeys,
   reconcileThreadRuntimeWithSessions,
   resolveNewConversationProject,
@@ -12,6 +14,7 @@ import {
   selectedSessionIsRunning,
   sessionRunBadgeState,
   shouldClearRuntimeWhenNoActiveRuns,
+  shouldDropRunningActivityMissingFromActiveRuns,
   shouldDropRunningActivityWhenNoActiveRuns,
   shouldPreserveLocalRunsFromStatus,
   titleFromFirstMessage
@@ -56,14 +59,18 @@ test('applyPwaTheme syncs iOS PWA meta with dark theme', () => {
   assert.equal(elements.get('meta[data-app-status-bar-style]').content, 'black-translucent');
 });
 
-test('status sync preserves local turn polling and refresh timers only', () => {
+test('status sync preserves only active local submission polling', () => {
   assert.equal(
     shouldPreserveLocalRunsFromStatus({ activePollCount: 1 }),
     true
   );
   assert.equal(
+    shouldPreserveLocalRunsFromStatus({ activePollCount: 1, forceClear: true }),
+    false
+  );
+  assert.equal(
     shouldPreserveLocalRunsFromStatus({ turnRefreshTimerCount: 1 }),
-    true
+    false
   );
   assert.equal(
     shouldPreserveLocalRunsFromStatus({
@@ -97,8 +104,41 @@ test('empty activeRuns status keeps desktop thread running activity', () => {
   }), false);
   assert.equal(shouldClearRuntimeWhenNoActiveRuns({
     status: 'running',
+    source: 'desktop-ipc'
+  }), true);
+  assert.equal(shouldClearRuntimeWhenNoActiveRuns({
+    status: 'running',
+    source: 'headless-local'
+  }), true);
+  assert.equal(shouldClearRuntimeWhenNoActiveRuns({
+    status: 'running',
     source: 'codexmobile'
   }), true);
+});
+
+test('activeRuns status drops stale mobile running activity from other turns', () => {
+  const activeRunKeys = new Set(['active-session', 'active-turn']);
+
+  assert.equal(shouldDropRunningActivityMissingFromActiveRuns({
+    role: 'activity',
+    kind: 'turn',
+    status: 'running',
+    sessionId: 'stale-session',
+    turnId: 'stale-turn'
+  }, activeRunKeys), true);
+  assert.equal(shouldDropRunningActivityMissingFromActiveRuns({
+    role: 'activity',
+    kind: 'turn',
+    status: 'running',
+    sessionId: 'active-session',
+    turnId: 'active-turn'
+  }, activeRunKeys), false);
+  assert.equal(shouldDropRunningActivityMissingFromActiveRuns({
+    role: 'activity',
+    kind: 'desktop',
+    status: 'running',
+    sessionId: 'stale-desktop'
+  }, activeRunKeys), false);
 });
 
 test('activeRuns status merge can preserve external desktop runtimes beside mobile runs', () => {
@@ -110,6 +150,8 @@ test('activeRuns status merge can preserve external desktop runtimes beside mobi
   };
   const preserved = externalThreadRuntimeById({
     'desktop-thread-1': desktopRuntime,
+    'desktop-ipc-turn-1': { status: 'running', source: 'desktop-ipc' },
+    'headless-turn-1': { status: 'running', source: 'headless-local' },
     'mobile-turn-1': { status: 'running', source: 'codexmobile' },
     'completed-thread': { status: 'completed', source: 'desktop-thread' }
   });
@@ -182,13 +224,21 @@ test('titleFromFirstMessage uses the shared provisional title helper', () => {
   assert.equal(titleFromFirstMessage('帮我看一下移动端新对话逻辑'), '移动端新对话逻辑');
 });
 
-test('sessionRunBadgeState prefers explicit running runtime', () => {
+test('sessionRunBadgeState ignores session index runtime but honors live runtime', () => {
   const session = {
     id: 'thread-1',
     runtime: { status: 'running', turnId: 'turn-1', updatedAt: '2026-05-08T02:00:00.000Z' }
   };
 
-  assert.equal(sessionRunBadgeState(session), 'running');
+  assert.equal(sessionRunBadgeState(session), null);
+  assert.equal(
+    sessionRunBadgeState(session, {
+      threadRuntimeById: {
+        'thread-1': { status: 'running', source: 'headless-local' }
+      }
+    }),
+    'running'
+  );
 });
 
 test('sessionRunBadgeState reads active runs by session id', () => {
@@ -200,7 +250,7 @@ test('sessionRunBadgeState reads active runs by session id', () => {
   );
 });
 
-test('session runtime reconciliation keeps multiple desktop threads running in the sidebar', () => {
+test('session runtime reconciliation keeps index hints out of the live running badge', () => {
   const runtimeById = reconcileThreadRuntimeWithSessions({}, {
     projectA: [
       {
@@ -225,17 +275,20 @@ test('session runtime reconciliation keeps multiple desktop threads running in t
   });
 
   assert.equal(runtimeById['thread-1'].status, 'running');
+  assert.equal(runtimeById['thread-1'].fromSessionIndex, true);
   assert.equal(runtimeById['turn-1'].sessionId, 'thread-1');
   assert.equal(runtimeById['thread-2'].status, 'running');
+  assert.equal(runtimeById['thread-2'].fromSessionIndex, true);
   assert.equal(runtimeById['turn-2'].sessionId, 'thread-2');
-  assert.equal(sessionRunBadgeState({ id: 'thread-1' }, { threadRuntimeById: runtimeById }), 'running');
-  assert.equal(sessionRunBadgeState({ id: 'thread-2' }, { threadRuntimeById: runtimeById }), 'running');
+  assert.equal(sessionRunBadgeState({ id: 'thread-1' }, { threadRuntimeById: runtimeById }), null);
+  assert.equal(sessionRunBadgeState({ id: 'thread-2' }, { threadRuntimeById: runtimeById }), null);
 });
 
 test('session runtime reconciliation clears stale desktop runtime for loaded sessions', () => {
   const runtime = {
     status: 'running',
     source: 'desktop-thread',
+    fromSessionIndex: true,
     sessionId: 'thread-1',
     turnId: 'turn-1',
     updatedAt: '2026-05-08T02:00:00.000Z'
@@ -284,4 +337,18 @@ test('viewportSizingMetrics exposes keyboard inset from visual viewport', () => 
   assert.equal(metrics.keyboardOpen, true);
   assert.equal(metrics.keyboardInset, 324);
   assert.equal(metrics.height, 520);
+});
+
+test('localFileApiPath can include token for direct browser navigation', () => {
+  assert.equal(
+    localFileApiPath('/Users/demo/report.md', 'secret token'),
+    '/api/local-file?path=%2FUsers%2Fdemo%2Freport.md&token=secret%20token'
+  );
+});
+
+test('localFilePreviewPath routes local files through the mobile preview page', () => {
+  assert.equal(
+    localFilePreviewPath('/Users/demo/report.md', 'secret token'),
+    '/preview/file?path=%2FUsers%2Fdemo%2Freport.md&token=secret+token'
+  );
 });

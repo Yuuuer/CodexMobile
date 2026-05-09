@@ -468,6 +468,19 @@ function appItemStatus(method, item) {
   return 'running';
 }
 
+export function shouldCompleteTurnFromAppServerItem(method, item, content = '') {
+  if (method !== 'item/completed' || item?.type !== 'agentMessage') {
+    return false;
+  }
+  if (String(item?.phase || '').toLowerCase() === 'commentary') {
+    return false;
+  }
+  if (appItemStatus(method, item) !== 'completed') {
+    return false;
+  }
+  return Boolean(String(content || item?.text || '').trim());
+}
+
 function normalizeAppItem(item, state = {}) {
   if (!item || typeof item !== 'object') {
     return item;
@@ -572,6 +585,12 @@ function emitAppServerItem({ method, params }, sessionId, turnId, emit, state) {
     });
     if (!isCommentary) {
       state.hadAssistantText = true;
+      if (shouldCompleteTurnFromAppServerItem(method, rawItem, content)) {
+        state.scheduleFallbackTurnCompletion?.({
+          completedAt: new Date().toISOString(),
+          fallback: 'final-assistant-item'
+        });
+      }
     }
     return;
   }
@@ -768,7 +787,10 @@ export async function runCodexTurn({ sessionId, draftSessionId, projectPath, mes
     context: {},
     agentMessages: new Map(),
     commandOutputs: new Map(),
-    items: new Map()
+    items: new Map(),
+    fallbackCompletionTimer: null,
+    turnCompletionResolved: false,
+    scheduleFallbackTurnCompletion: null
   };
   const run = {
     thread: null,
@@ -791,6 +813,22 @@ export async function runCodexTurn({ sessionId, draftSessionId, projectPath, mes
     completionResolve = resolve;
     completionReject = reject;
   });
+  function resolveTurnCompletion(turn = {}) {
+    if (state.turnCompletionResolved) {
+      return;
+    }
+    state.turnCompletionResolved = true;
+    completionResolve(turn);
+  }
+  state.scheduleFallbackTurnCompletion = (turn = {}) => {
+    if (state.turnCompletionResolved || state.fallbackCompletionTimer) {
+      return;
+    }
+    state.fallbackCompletionTimer = setTimeout(() => resolveTurnCompletion(turn), 750);
+    if (typeof state.fallbackCompletionTimer.unref === 'function') {
+      state.fallbackCompletionTimer.unref();
+    }
+  };
   const abortPromise = new Promise((_, reject) => {
     abortController.signal.addEventListener('abort', () => reject(abortError()), { once: true });
   });
@@ -859,7 +897,7 @@ export async function runCodexTurn({ sessionId, draftSessionId, projectPath, mes
             timestamp: timing.completedAt
           });
           emit({ type: 'turn-complete', sessionId: currentSessionId, turnId, usage: state.usage, ...timing });
-          completionResolve(params.turn || {});
+          resolveTurnCompletion(params.turn || {});
         } else if (appMessage.method === 'error' && !params.willRetry) {
           completionReject(new Error(errorTextFromNotification(params)));
         }
@@ -1014,6 +1052,9 @@ export async function runCodexTurn({ sessionId, draftSessionId, projectPath, mes
     }
     if (turnInactivityTimeoutTimer) {
       clearTimeout(turnInactivityTimeoutTimer);
+    }
+    if (state.fallbackCompletionTimer) {
+      clearTimeout(state.fallbackCompletionTimer);
     }
     if (client) {
       client.close();

@@ -291,48 +291,69 @@ test('git service sync pulls then pushes only when ahead remains', async () => {
   assert.equal(result.status.ahead, 0);
 });
 
-test('git service blocks commit on non-codex branches', async () => {
+test('git service commits on non-codex branches when the repository allows it', async () => {
+  const calls = [];
+  let statusCount = 0;
   const service = createGitService({
     getProject: () => ({ path: '/repo' }),
     runner: async (cwd, args) => {
+      calls.push(args.join(' '));
       if (args[0] === 'rev-parse') {
-        return { stdout: '/repo\n', stderr: '' };
+        return args[1] === '--short'
+          ? { stdout: 'abc123\n', stderr: '' }
+          : { stdout: '/repo\n', stderr: '' };
       }
       if (args[0] === 'status') {
-        return { stdout: '## main...origin/main\n M vault.md\n', stderr: '' };
+        statusCount += 1;
+        return {
+          stdout: statusCount === 1
+            ? '## main...origin/main\n M vault.md\n'
+            : '## main...origin/main [ahead 1]\n',
+          stderr: ''
+        };
+      }
+      if (args[0] === 'add') {
+        return { stdout: '', stderr: '' };
+      }
+      if (args[0] === 'commit') {
+        return { stdout: '[main abc123] 更新 vault\n', stderr: '' };
       }
       throw new Error(`unexpected git ${args.join(' ')}`);
     }
   });
 
-  await assert.rejects(
-    () => service.commit('project-1', '更新 vault'),
-    /移动端只允许在 codex\/ 分支执行提交或推送/
-  );
+  const result = await service.commit('project-1', '更新 vault');
+  assert.equal(calls.includes('add -A'), true);
+  assert.equal(calls.includes('commit -m 更新 vault'), true);
+  assert.equal(result.hash, 'abc123');
 });
 
-test('git service blocks push when the dirty file list is too large', async () => {
+test('git service pushes when the dirty file list is too large for display', async () => {
   const output = [
     '## codex/git-panel...origin/codex/git-panel [ahead 1]',
     ...Array.from({ length: 501 }, (_, index) => ` M file-${index}.md`)
   ].join('\n');
+  const calls = [];
   const service = createGitService({
     getProject: () => ({ path: '/repo' }),
     runner: async (cwd, args) => {
+      calls.push(args.join(' '));
       if (args[0] === 'rev-parse') {
         return { stdout: '/repo\n', stderr: '' };
       }
       if (args[0] === 'status') {
         return { stdout: output, stderr: '' };
       }
+      if (args[0] === 'push') {
+        return { stdout: 'pushed\n', stderr: '' };
+      }
       throw new Error(`unexpected git ${args.join(' ')}`);
     }
   });
 
-  await assert.rejects(
-    () => service.push('project-1'),
-    /改动文件过多/
-  );
+  const result = await service.push('project-1');
+  assert.equal(calls.includes('push origin'), true);
+  assert.equal(result.branch, 'codex/git-panel');
 });
 
 test('git service commitPush commits and then pushes', async () => {
