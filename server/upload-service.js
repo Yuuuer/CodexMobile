@@ -193,7 +193,7 @@ export function withAttachmentReferences(message, attachments) {
     return message;
   }
 
-  const fileLines = attachments.filter((attachment) => attachment.kind !== 'image').map((attachment) => {
+  const fileLines = attachments.map((attachment) => {
     const type = attachment.kind === 'image' ? '图片' : '文件';
     return `- ${type}: ${attachment.name} (${attachment.path})`;
   });

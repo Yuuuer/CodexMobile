@@ -741,12 +741,16 @@ test('sendChat registers new projectless background threads for mobile and deskt
     projectId: '__codexmobile_projectless__',
     draftSessionId: 'draft-projectless-1',
     clientTurnId: 'client-turn',
-    message: '你好呀'
+    message: '你好呀',
+    attachments: [
+      { id: 'img-1', name: '午餐.png', path: '/tmp/lunch.png', mimeType: 'image/png', kind: 'image' }
+    ]
   });
   await flushQueuedWork();
 
   assert.equal(result.accepted, true);
   assert.equal(runPayload.draftSessionId, 'draft-projectless-1');
+  assert.match(runPayload.message, /图片: 午餐\.png \(\/tmp\/lunch\.png\)/);
   assert.match(runPayload.projectPath, /\/tmp\/codex-projectless\/\d{4}-\d{2}-\d{2}\/mobile-chat-/);
   assert.deepEqual(desktopRegistration, {
     threadId: 'projectless-thread-1',
@@ -755,6 +759,7 @@ test('sendChat registers new projectless background threads for mobile and deskt
   assert.equal(mobileRegistration.id, 'projectless-thread-1');
   assert.equal(mobileRegistration.projectless, true);
   assert.equal(mobileRegistration.summary, '你好呀');
+  assert.match(mobileRegistration.messages[0].content, /!\[午餐\.png\]\(\/tmp\/lunch\.png\)/);
 });
 
 test('sendChat remembers a started background thread path before broadcasting it', async () => {

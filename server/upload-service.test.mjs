@@ -51,7 +51,7 @@ test('normalizeAttachments keeps valid paths and splits image/file references', 
   );
   assert.equal(
     withAttachmentReferences('看文件', attachments),
-    '看文件\n\n附件路径:\n- 文件: brief.pdf (/tmp/brief.pdf)'
+    '看文件\n\n附件路径:\n- 图片: 图[片].png (/tmp/a image.png)\n- 文件: brief.pdf (/tmp/brief.pdf)'
   );
 });
 

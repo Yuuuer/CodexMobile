@@ -66,6 +66,7 @@ test('prepareChatRequest normalizes skills, plan mode, attachments, and file men
   });
   assert.match(prepared.visibleMessage, /!\[截图\.png\]\(<\/tmp\/screen shot\.png>\)/);
   assert.match(prepared.codexMessage, /附件路径:/);
+  assert.match(prepared.codexMessage, /截图\.png \(\/tmp\/screen shot\.png\)/);
   assert.match(prepared.codexMessage, /notes\.md \(\/tmp\/notes\.md\)/);
   assert.match(prepared.codexMessage, /引用文件路径:/);
   assert.match(prepared.codexMessage, /App\.jsx \(\/repo\/client\/src\/App\.jsx\)/);

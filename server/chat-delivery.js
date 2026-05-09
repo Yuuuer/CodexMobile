@@ -283,6 +283,7 @@ export function runQueuedHeadlessChatJob({
       return;
     }
     const updatedAt = payload.startedAt || new Date().toISOString();
+    const visibleContent = job.visibleMessage || job.displayMessage;
     const sessionRecord = {
       id: payload.sessionId,
       projectId: job.project.id,
@@ -296,7 +297,7 @@ export function runQueuedHeadlessChatJob({
         {
           id: `${payload.sessionId}-user-${job.turnId}`,
           role: 'user',
-          content: job.displayMessage,
+          content: visibleContent,
           timestamp: updatedAt
         }
       ]
