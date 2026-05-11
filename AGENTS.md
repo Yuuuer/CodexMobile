@@ -1,5 +1,21 @@
 # CodexMobile — Agent / 开发者约定
 
+## 注意事项
+你的工作目录在CodexMobile下，你可以读写CodexMobile目录下的文件及其子文件夹中的文件。
+当你访问非CodexMobile范围内的文件时：严禁写入/删除系统文件或其他目录下的文件，能够已只读的方式读取，但读取时需要提前通知我进行审核。
+node_modules为node模块文件，一般无需访问。
+
+## 项目总览
+CodexMobile 是一个单仓库、多层职责拆分的项目：
+
+- `server/`：Node.js 桥接层，负责认证、会话、聊天、Git、文件、通知、语音和静态资源。
+- `client/`：React + Vite 的移动端 PWA 前端，负责状态编排、聊天界面、Composer 和侧边面板。
+- `shared/`：前后端共用的纯函数和数据规则，避免重复实现。
+- `asr-service/`：独立的 Python FastAPI 语音识别服务，可选接入。
+- `scripts/`：启动、安装、校验和运维脚本。
+- `skills/`：本地 skill 定义。
+- `docs/`：说明文档、计划和示例图片。
+
 ## 源文件头部注释（新建与修改时必须遵守）
 
 除下方「免检」条目外，`client/`、`server/`、`shared/`、`scripts/` 下所有 hand-written 的 `*.js`、`*.jsx`、`*.mjs`、`*.cjs` 在**首个非空行之前**须有块注释，便于人类扫读与 agent 语义检索。**不要**使用 `@file xxx` 重复路径（编辑器与工具已可知路径）。
@@ -42,3 +58,5 @@ import ...
 
 - 新增或大范围编辑某文件时，若缺头部或陈旧，顺手按本模板补齐。
 - 禁止为「凑字数」复述 import 列表；写的是**职责与数据流**，不是目录树副本。
+
+
