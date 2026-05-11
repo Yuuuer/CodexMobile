@@ -1,3 +1,17 @@
+/**
+ * 聊天中的「生图回合」分支：续画检测、runImageTurn 编排与状态回填。
+ *
+ * Keywords: chat-image, image-turn, dalle, attachments
+ *
+ * Exports:
+ * - createChatImageHandler — 返回图片处理钩子集合。
+ *
+ * Inward（本模块依赖/组装的关键符号）: Node fs/crypto/path；注入 runImageTurn、isImageRequest、broadcast。
+ *
+ * Outward（谁在用/调用场景）: chat-service。
+ *
+ * 不负责: 底层 image-generator HTTP/CLI（由注入方实现）。
+ */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';

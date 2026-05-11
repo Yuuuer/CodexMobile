@@ -1,3 +1,18 @@
+/**
+ * 语音转写：本机 SenseVoice、OpenAI 转写 API 等，含繁简转换与超时控制。
+ *
+ * Keywords: stt, whisper, sensevoice, opencc
+ *
+ * Exports:
+ * - voiceTranscriptionConfig / publicVoiceTranscriptionStatus — 配置与可展示状态。
+ * - transcribeAudio — 根据缓冲音频返回文本。
+ *
+ * Inward（本模块依赖/组装的关键符号）: provider-api、opencc-js。
+ *
+ * Outward（谁在用/调用场景）: voice-routes。
+ *
+ * 不负责: WebSocket Realtime（见 realtime-voice）。
+ */
 import { DEFAULT_OPENAI_COMPATIBLE_BASE_URL, normalizeBaseUrl, readCliProxyApiKeys } from './provider-api.js';
 import { Converter } from 'opencc-js';
 

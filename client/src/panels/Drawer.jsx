@@ -1,6 +1,20 @@
+/**
+ * 主侧栏抽屉：项目 / 会话列表、配额与设置入口、归档与子代理等。
+ *
+ * Keywords: drawer, sidebar, sessions, projects, settings
+ *
+ * Exports:
+ * - Drawer — 侧栏根组件。
+ *
+ * Inward: apiFetch、runtime-debug-client、session-utils（路径展示与运行时摘要）；lucide-react。
+ *
+ * Outward: App 根布局在菜单打开时渲染。
+ */
+
 import { Archive, BarChart3, ChevronDown, ChevronLeft, Folder, Loader2, MessageSquare, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Settings, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../api.js';
+import { setClientRuntimeDebugEnabled } from '../app/runtime-debug-client.js';
 import { compactPath, formatTime, sessionRunBadgeState, subAgentSubtitle } from '../app/session-utils.js';
 
 function quotaPercent(value) {
@@ -92,7 +106,9 @@ export function Drawer({
   onSync,
   syncing,
   theme,
-  setTheme
+  setTheme,
+  runtimeDebug,
+  refreshStatus
 }) {
   const [drawerView, setDrawerView] = useState('main');
   const [subagentExpandedById, setSubagentExpandedById] = useState({});
@@ -105,6 +121,8 @@ export function Drawer({
   const [drawerQuery, setDrawerQuery] = useState('');
   const [threadActionMenu, setThreadActionMenu] = useState(null);
   const [newConversationOpen, setNewConversationOpen] = useState(false);
+  const [runtimeDebugError, setRuntimeDebugError] = useState('');
+  const [runtimeDebugSaving, setRuntimeDebugSaving] = useState(false);
   const normalizedDrawerQuery = drawerQuery.trim().toLowerCase();
   const runningCount = Object.values(sessionsByProject || {})
     .flatMap((sessions) => (Array.isArray(sessions) ? sessions : []))
@@ -187,6 +205,29 @@ export function Drawer({
     setQuotaExpanded((current) => !current);
   }
 
+  useEffect(() => {
+    if (!runtimeDebug) {
+      return;
+    }
+    setClientRuntimeDebugEnabled(Boolean(runtimeDebug.uiEnabled));
+  }, [runtimeDebug?.uiEnabled]);
+
+  async function handleRuntimeDebugToggle(event) {
+    const enabled = event.target.checked;
+    setRuntimeDebugError('');
+    setRuntimeDebugSaving(true);
+    try {
+      await apiFetch('/api/runtime-debug', { method: 'POST', body: { enabled } });
+      setClientRuntimeDebugEnabled(enabled);
+      await refreshStatus?.();
+    } catch (error) {
+      setRuntimeDebugError(error.message || '保存失败');
+      await refreshStatus?.();
+    } finally {
+      setRuntimeDebugSaving(false);
+    }
+  }
+
   if (drawerView === 'settings') {
     return (
       <>
@@ -230,6 +271,30 @@ export function Drawer({
                   >
                     跟随系统
                   </button>
+                </div>
+              </div>
+            </section>
+            <section className="settings-group">
+              <div className="drawer-heading">开发与排查</div>
+              <div className="theme-setting">
+                <label className="setting-row">
+                  <span>运行态调试日志</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(runtimeDebug?.uiEnabled)}
+                    disabled={runtimeDebugSaving}
+                    onChange={handleRuntimeDebugToggle}
+                  />
+                </label>
+                <div className="theme-setting-title">
+                  <small>
+                    开启后服务端把运行态事件写入项目下的 {runtimeDebug?.logRelativePath || '.codexmobile/logs/runtime-debug.jsonl'}
+                    （JSONL）；助手读取仓库时可直接打开该文件。浏览器控制台会同步输出 [runtime-debug][client]。
+                  </small>
+                  {runtimeDebug?.envEnabled ? (
+                    <small>已通过环境变量 CODEXMOBILE_RUNTIME_DEBUG 启用（与本开关可同时生效）。</small>
+                  ) : null}
+                  {runtimeDebugError ? <small className="runtime-debug-error">{runtimeDebugError}</small> : null}
                 </div>
               </div>
             </section>

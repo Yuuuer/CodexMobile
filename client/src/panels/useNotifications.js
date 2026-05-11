@@ -1,3 +1,16 @@
+/**
+ * 浏览器通知与站内 Toast 的权限、偏好、Web Push 注册与服务器同步。
+ *
+ * Keywords: notifications, web-push, toast, permission, preferences
+ *
+ * Exports:
+ * - useNotifications — 返回 toasts、开关状态与操作方法。
+ *
+ * Inward: apiFetch、notification-events、web-push-client。
+ *
+ * Outward: App 顶层挂载 ToastStack 前初始化通知能力。
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../api.js';
 import {

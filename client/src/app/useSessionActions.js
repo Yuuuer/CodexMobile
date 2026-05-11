@@ -1,3 +1,16 @@
+/**
+ * 会话 CRUD 与导航：新建/删除/重命名、加载消息、切换项目、草稿转正与标题补丁等，集中封装为回调集合。
+ *
+ * Keywords: session-actions, draft-session, session-title, api-mutations
+ *
+ * Exports:
+ * - `useSessionActions` — 返回会话相关 `handle*` 的 hook。
+ *
+ * Inward: `api`；`session-utils`、`context-status`、`shared/session-title`、`send-state`。
+ *
+ * Outward: `App.jsx` 注入侧栏与聊天操作。
+ */
+
 import { apiFetch } from '../api.js';
 import { desktopBridgeCanCreateThread } from '../send-state.js';
 import { sessionTitleFromConversation } from '../../../shared/session-title.js';

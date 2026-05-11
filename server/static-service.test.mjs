@@ -1,3 +1,12 @@
+/**
+ * 测试 server/static-service.js：本地文件服务、可编辑扩展名与安全路径。
+ *
+ * Keywords: static-service, test, local-file
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: static-service.js
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';

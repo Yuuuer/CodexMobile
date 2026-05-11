@@ -1,3 +1,10 @@
+/**
+ * 测试 app/model-sync.js：Composer 模型与桌面状态同步推导。
+ * Keywords: model-sync, composer, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: app/model-sync.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

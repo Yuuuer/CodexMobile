@@ -1,3 +1,10 @@
+/**
+ * 测试 chat/memory-citation.js：记忆引用块拆分与展示行格式化。
+ * Keywords: memory-citation, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: chat/memory-citation.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

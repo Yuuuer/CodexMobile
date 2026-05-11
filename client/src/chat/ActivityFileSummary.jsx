@@ -1,3 +1,16 @@
+/**
+ * 活动变更文件列表与 unified diff 行级渲染，展示在活动卡片底部。
+ *
+ * Keywords: activity diff, file summary, unified diff
+ *
+ * Exports:
+ * - ActivityFileSummary — 汇总 additions/deletions 与各文件可折叠 diff。
+ *
+ * Inward: 无跨包依赖；解析 diff 文本为行结构。
+ *
+ * Outward: ActivityTimeline.jsx
+ */
+
 function parseUnifiedDiffLines(unifiedDiff = '') {
   const rows = [];
   let oldLine = null;

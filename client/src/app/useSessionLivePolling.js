@@ -1,3 +1,16 @@
+/**
+ * 当会话仍有运行中活动时，定时拉取消息流签名并合并桌面活动 runtime，保持选中线程与服务端一致。
+ *
+ * Keywords: live-polling, session-messages, running-activity
+ *
+ * Exports:
+ * - `useSessionLivePolling` — 基于认证与选中会话驱动轮询的 effect hook。
+ *
+ * Inward: `api`、`session-live-refresh`、`activity-model` 签名、`session-utils`。
+ *
+ * Outward: `App.jsx` 与会话实时展示链路配合。
+ */
+
 import { useEffect } from 'react';
 import { apiFetch } from '../api.js';
 import {

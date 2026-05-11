@@ -1,3 +1,20 @@
+/**
+ * 从 Codex 会话索引与会话文件构建移动端可用的项目/会话列表视图。
+ *
+ * Keywords: session-index, projectless, sqlite, jsonl, path-normalize
+ *
+ * Exports:
+ * - PROJECTLESS_PROJECT_ID / PROJECTLESS_PROJECT_NAME — 无项目会话占位。
+ * - normalizeComparablePath — 路径规范化比对。
+ * - projectIdFor — 由路径生成项目 id。
+ * - buildSessionIndex — 扫描并产出索引快照。
+ *
+ * Inward（本模块依赖/组装的关键符号）: Node fs、sqlite（state DB）、sessions 目录布局。
+ *
+ * Outward（谁在用/调用场景）: codex-data 刷新缓存、会话 API。
+ *
+ * 不负责: HTTP 传输层。
+ */
 import crypto from 'node:crypto';
 import fsSync from 'node:fs';
 import os from 'node:os';

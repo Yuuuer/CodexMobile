@@ -1,3 +1,12 @@
+/**
+ * 测试 server/git-routes.js：Git API 路由与错误映射。
+ *
+ * Keywords: git-routes, test, http
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: git-routes.js
+ */
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import test from 'node:test';

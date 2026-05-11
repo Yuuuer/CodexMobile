@@ -1,3 +1,12 @@
+/**
+ * 测试 server/auth.js：Bearer 与 query token 提取优先级。
+ *
+ * Keywords: auth, bearer-token, test
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: auth.js
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

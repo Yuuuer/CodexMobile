@@ -1,3 +1,17 @@
+/**
+ * 飞书 OAuth 与文档快捷入口相关的 HTTP 集成（状态页、回调、Pending 队列）。
+ *
+ * Keywords: feishu, oauth, lark, integration
+ *
+ * Exports:
+ * - createFeishuIntegration — 返回处理器集合与路由挂载所需闭包。
+ *
+ * Inward（本模块依赖/组装的关键符号）: http-utils、crypto/fs/path 持久化 pending 状态。
+ *
+ * Outward（谁在用/调用场景）: server/index 注册 feishu 相关路径。
+ *
+ * 不负责: lark-cli 子命令实现。
+ */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';

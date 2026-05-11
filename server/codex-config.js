@@ -1,3 +1,19 @@
+/**
+ * 读写 ~/.codex 下 config.toml、技能列表、模型缓存与项目外线程注册。
+ *
+ * Keywords: codex-config, toml, skills, sqlite-path, projectless
+ *
+ * Exports:
+ * - CODEX_HOME 等路径常量。
+ * - readCodexSkills / readCodexModels / readCodexWorkspaceState。
+ * - registerProjectlessThread(s) / readCodexConfig。
+ *
+ * Inward（本模块依赖/组装的关键符号）: Node fs、CODEX_HOME 目录布局。
+ *
+ * Outward（谁在用/调用场景）: codex-data、provider-api、全站配置读取。
+ *
+ * 不负责: 执行 Codex 二进制。
+ */
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';

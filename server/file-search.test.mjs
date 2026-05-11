@@ -1,3 +1,12 @@
+/**
+ * 测试 server/file-search.js：git ls-files 搜索与忽略目录规则。
+ *
+ * Keywords: file-search, test, git
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: file-search.js
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';

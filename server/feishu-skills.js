@@ -1,3 +1,17 @@
+/**
+ * 按用户消息匹配飞书/Lark 快捷 SKILL.md，拼接进模型提示词以约束 lark-cli 用法。
+ *
+ * Keywords: feishu-skills, lark-cli, skill-md, prompt-injection
+ *
+ * Exports:
+ * - buildFeishuSkillInstruction — 异步生成附加指令文本（可为空）。
+ *
+ * Inward（本模块依赖/组装的关键符号）: 仓库 `skills/lark-*` 下 Markdown。
+ *
+ * Outward（谁在用/调用场景）: lark-cli.buildCodexLarkCliContext。
+ *
+ * 不负责: 执行 lark-cli。
+ */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

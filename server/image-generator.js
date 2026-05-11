@@ -1,3 +1,19 @@
+/**
+ * 移动端生图：调用 OpenAI 兼容 images API，落盘并把结果登记到移动会话索引。
+ *
+ * Keywords: image-generation, dall-e, openai-compatible, mobile-session
+ *
+ * Exports:
+ * - GENERATED_ROOT — 生成图默认目录。
+ * - isImageRequest — 启发式判断是否走生图回合。
+ * - runImageTurn — 执行一轮生图并更新会话。
+ *
+ * Inward（本模块依赖/组装的关键符号）: mobile-session-index、provider-api、shared/session-title。
+ *
+ * Outward（谁在用/调用场景）: chat-image-handler、native/legacy 路径。
+ *
+ * 不负责: Codex CLI 内建生图（与 codex-native-images 配合）。
+ */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';

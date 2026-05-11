@@ -1,3 +1,17 @@
+/**
+ * 从用户/助手首条消息提炼会话标题：剥离 Markdown、口头禅与弱句，并截断长度。
+ *
+ * Keywords: session-title, provisionalSessionTitle, conversation, markdown-stripping, normalization
+ *
+ * Exports:
+ * - provisionalSessionTitle — 单条消息的临时标题。
+ * - sessionTitleFromConversation — 综合用户与助手消息择优标题。
+ *
+ * Inward（本模块依赖/组装的关键符号）: 无外部依赖，纯字符串处理。
+ *
+ * Outward（谁在用/调用场景）: client session-utils / useSessionActions；server session-title-generator、mobile-session-index、image-generator。
+ */
+
 const DEFAULT_TITLE = '新对话';
 const MAX_TITLE_LENGTH = 22;
 

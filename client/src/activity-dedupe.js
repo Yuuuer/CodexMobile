@@ -1,3 +1,17 @@
+/**
+ * 聊天活动去重：规范化文案并在最终答案展示时移除重复的活动旁白。
+ *
+ * Keywords: activity, dedupe, final-answer, messages
+ *
+ * Exports:
+ * - normalizeActivityText — 空白折叠与 trim。
+ * - removeDuplicateFinalAnswerActivity — 按 turn/session 键匹配并清理活动步骤。
+ *
+ * Inward: 无；仅依赖消息对象结构约定。
+ *
+ * Outward: 会话消息归并、与活动相关的 reducer 管线。
+ */
+
 export function normalizeActivityText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }

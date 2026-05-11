@@ -1,3 +1,16 @@
+/**
+ * 将用户选择的文件经 `/api/uploads` 上传，并把返回的附件附加到 Composer 与消息列表。
+ *
+ * Keywords: file-upload, attachments, formdata
+ *
+ * Exports:
+ * - `useFileUploads` — 提供 `handleUploadFiles` 与上传中状态的 hook。
+ *
+ * Inward: `api`。
+ *
+ * Outward: `App.jsx` Composer 附件流程。
+ */
+
 import { apiFetch } from '../api.js';
 
 export function useFileUploads({

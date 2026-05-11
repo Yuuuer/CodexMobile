@@ -1,3 +1,19 @@
+/**
+ * 浏览器 Web Push：VAPID 解码、能力检测、开通提示文案与服务 Worker 注册订阅。
+ *
+ * Keywords: web-push, VAPID, service-worker, PWA, iOS
+ *
+ * Exports:
+ * - urlBase64ToUint8Array — 公钥转 Uint8Array。
+ * - browserPushSupported — 环境是否具备 Push。
+ * - notificationEnablementMessage — 向用户解释的开通条件文案。
+ * - registerWebPush — 注册并上报订阅。
+ *
+ * Inward: fetch、navigator.serviceWorker（运行时）。
+ *
+ * Outward: useNotifications。
+ */
+
 export function urlBase64ToUint8Array(value) {
   const padding = '='.repeat((4 - String(value || '').length % 4) % 4);
   const base64 = `${value}${padding}`.replace(/-/g, '+').replace(/_/g, '/');

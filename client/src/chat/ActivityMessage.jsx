@@ -1,3 +1,16 @@
+/**
+ * 活动类消息气泡：折叠摘要、时长、失败态与 projectActivityView 时间线。
+ *
+ * Keywords: activity message, timeline, running
+ *
+ * Exports:
+ * - ActivityMessage — 渲染单条 activity role 消息或 null。
+ *
+ * Inward: session-utils、activity-model、activity-timeline-projection、ActivityTimeline。
+ *
+ * Outward: ChatMessage.jsx
+ */
+
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatDuration, formatDurationMs } from '../app/session-utils.js';

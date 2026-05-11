@@ -1,3 +1,10 @@
+/**
+ * 测试 session-live-refresh.js：轮询条件、消息合并、运行中活动与重命名同步。
+ * Keywords: session-refresh, polling, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: session-live-refresh.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

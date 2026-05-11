@@ -1,3 +1,16 @@
+/**
+ * 将文本写入系统剪贴板：优先 Async Clipboard API，失败时 textarea + execCommand 回退。
+ *
+ * Keywords: clipboard, copy, fallback, mobile, PWA
+ *
+ * Exports:
+ * - copyTextToClipboard — 返回是否复制成功。
+ *
+ * Inward: navigator.clipboard、document（DOM）。
+ *
+ * Outward: TopBar、GitPanel 等复制操作。
+ */
+
 export async function copyTextToClipboard(text) {
   const value = String(text || '');
   try {

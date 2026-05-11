@@ -1,3 +1,16 @@
+/**
+ * 聊天主滚动区：会话切换时跟底、显示回到底部按钮与消息列表容器。
+ *
+ * Keywords: ChatPane, scroll, chat messages
+ *
+ * Exports:
+ * - ChatPane — 包裹 ChatMessage 列表与底部对齐逻辑。
+ *
+ * Inward: ../chat-scroll.js、ChatMessage.jsx
+ *
+ * Outward: App.jsx
+ */
+
 import { AlertCircle, ArrowDown, Loader2, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { isNearChatBottom, shouldFollowChatOutput } from '../chat-scroll.js';

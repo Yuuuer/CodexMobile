@@ -1,3 +1,20 @@
+/**
+ * 将桌面 Codex thread/turn 结构投影为移动端聊天消息流（含计划/活动/附件）。
+ *
+ * Keywords: desktop-thread, message-projection, activity, plan
+ *
+ * Exports:
+ * - implementedPlanContentFromMessage / sanitizeVisibleUserMessage — 计划与用户消息清洗。
+ * - extractProposedPlanContent / planTitleFromContent / planMessageFromContent — 计划块构造。
+ * - upsertDesktopActivity / removeFallbackActivitiesCoveredByRaw / sortDesktopActivitySteps。
+ * - messagesFromDesktopThread — thread → messages[]。
+ *
+ * Inward（本模块依赖/组装的关键符号）: codex-native-images、codex-runner.statusLabel。
+ *
+ * Outward（谁在用/调用场景）: session-message-reader、codex-data 再导出。
+ *
+ * 不负责: 读取 thread JSON 文件。
+ */
 import crypto from 'node:crypto';
 import fsSync from 'node:fs';
 import path from 'node:path';

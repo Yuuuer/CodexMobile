@@ -1,3 +1,19 @@
+/**
+ * 回合发送辅助纯函数：选择体与 turn id 对齐、本地展示消息、Composer 提交体、技能路径、计划实施 prompt、中止后本地消息补齐与轮询决策。
+ *
+ * Keywords: turn-submission, composer-payload, optimistic-id, handoff-status
+ *
+ * Exports:
+ * - 选择对齐 — `realSessionIdFromTurn`、`turnMatchesSelection`、`sessionForTurnSelection`、`projectForTurnSelection`。
+ * - 消息与发送 — `displayMessageForTurn`、`prepareComposerSubmission`、`userMessageMetadataForSendMode`。
+ * - 计划与技能 — `IMPLEMENT_PLAN_PROMPT_PREFIX`、`implementationPromptForPlan`、`selectedSkillsForPaths`、`restoredComposerText`。
+ * - 轮询与中止 — `shouldPollTurnEndpointAfterSend`、`localHandoffStatusPayload`、`completeLocalAbortMessages`。
+ *
+ * Inward: `activity-model` 中活动/状态消息合并。
+ *
+ * Outward: `useTurnSubmission.js`。
+ */
+
 import {
   completeActivityMessagesForTurn,
   upsertStatusMessage

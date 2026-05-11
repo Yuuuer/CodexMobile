@@ -1,3 +1,18 @@
+/**
+ * 从会话 rollout JSONL 解析原始桌面活动（命令、文件变更、协作）供 thread 投影使用。
+ *
+ * Keywords: desktop-activity, jsonl, parser, rollout
+ *
+ * Exports:
+ * - rawSessionActivitiesFromJsonl — 同步解析文本。
+ * - readRawSessionActivities / readDesktopCollabActivities — 带路径的异步读取。
+ *
+ * Inward（本模块依赖/组装的关键符号）: codex-runner.statusLabel、readline 流式读。
+ *
+ * Outward（谁在用/调用场景）: session-message-reader、codex-data 再导出、测试。
+ *
+ * 不负责: 将活动转为聊天消息（见 desktop-thread-projector）。
+ */
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import readline from 'node:readline';

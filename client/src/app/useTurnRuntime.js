@@ -1,3 +1,17 @@
+/**
+ * 回合运行期副作用：根据 WS/轮询结果合并消息与 context，维护本地 running 活动与 turn 完成收尾。
+ *
+ * Keywords: turn-runtime, polling, activity-merge, running-keys
+ *
+ * Exports:
+ * - `runtimeKeysForPayload` / `completeMessagesForTurnCompletion` — payload 与会话对齐、轮次完成时的消息补齐。
+ * - `useTurnRuntime` — 订阅运行中 turn 的状态更新与消息合并的 hook。
+ *
+ * Inward: `api`、`activity-model`、`context-status`、`session-utils`、`runtime-debug-client`。
+ *
+ * Outward: `App.jsx` 编排会话与聊天数据流。
+ */
+
 import { useCallback, useEffect } from 'react';
 import { apiFetch } from '../api.js';
 import {
@@ -18,6 +32,7 @@ import {
   shouldDropRunningActivityWhenNoActiveRuns,
   shouldPreserveLocalRunsFromStatus
 } from './session-utils.js';
+import { clientRuntimeDebug } from './runtime-debug-client.js';
 
 export function runtimeKeysForPayload(payload, currentSession = null) {
   const keys = new Set(payloadRunKeys(payload));
@@ -109,6 +124,12 @@ export function useTurnRuntime({
       }
       return next;
     });
+    clientRuntimeDebug('markRun', {
+      keys,
+      source: payload.source || null,
+      sessionId: payload.sessionId || null,
+      turnId: payload.turnId || payload.clientTurnId || null
+    });
   }
 
   function clearRun(payload) {
@@ -132,6 +153,12 @@ export function useTurnRuntime({
         }
       }
       return next;
+    });
+    clientRuntimeDebug('clearRun', {
+      keys,
+      source: payload.source || null,
+      sessionId: payload.sessionId || null,
+      turnId: payload.turnId || payload.clientTurnId || null
     });
   }
 
@@ -189,6 +216,19 @@ export function useTurnRuntime({
       forceClear: Boolean(options.forceClear)
     });
 
+    clientRuntimeDebug('syncActiveRunsFromStatus.enter', {
+      activeRunsCount: activeRuns.length,
+      shouldPreserveLocalRuns,
+      forceClear: Boolean(options.forceClear),
+      activePollCount: activePollsRef.current.size,
+      turnRefreshTimerCount: turnRefreshTimersRef.current.size,
+      runs: activeRuns.map((r) => ({
+        sessionId: r.sessionId || null,
+        turnId: r.turnId || null,
+        source: r.source || null
+      }))
+    });
+
     if (!activeRuns.length) {
       if (!shouldPreserveLocalRuns) {
         setRunningById(() => {
@@ -210,6 +250,10 @@ export function useTurnRuntime({
           return current;
         }
         return current.filter((message) => !shouldDropRunningActivityWhenNoActiveRuns(message));
+      });
+      clientRuntimeDebug('syncActiveRunsFromStatus.exit', {
+        branch: 'empty-activeRuns',
+        clearedRuntime: !shouldPreserveLocalRuns
       });
       return;
     }
@@ -245,6 +289,11 @@ export function useTurnRuntime({
         current.filter((message) => !shouldDropRunningActivityMissingFromActiveRuns(message, activeRunKeys))
       );
     }
+    clientRuntimeDebug('syncActiveRunsFromStatus.exit', {
+      branch: 'merged-activeRuns',
+      shouldPreserveLocalRuns,
+      activeRunKeys: [...activeRunKeys]
+    });
   }, [activePollsRef, runningByIdRef, setMessages, setRunningById, setThreadRuntimeById, turnRefreshTimersRef]);
 
   function payloadMatchesCurrentConversation(payload) {

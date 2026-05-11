@@ -1,3 +1,19 @@
+/**
+ * 根据首条用户消息或回合结束条件自动生成会话标题（调用 OpenAI 兼容 API）。
+ *
+ * Keywords: session-title, openai-compatible, auto-rename
+ *
+ * Exports:
+ * - sanitizeGeneratedTitle — 清洗模型标题。
+ * - generateSessionTitle — 请求模型生成标题。
+ * - maybeAutoNameSession — 条件触发重命名与会话元数据更新。
+ *
+ * Inward（本模块依赖/组装的关键符号）: provider-api、shared/session-title。
+ *
+ * Outward（谁在用/调用场景）: chat-service 在适当时机自动命名。
+ *
+ * 不负责: 持久化会话索引（由调用方写入）。
+ */
 import { openAICompatibleConfig } from './provider-api.js';
 import { provisionalSessionTitle } from '../shared/session-title.js';
 

@@ -1,3 +1,16 @@
+/**
+ * 顶栏连接态文案：WebSocket / 桌面桥 / 选中会话与运行时的组合展示标签。
+ *
+ * Keywords: topbar, connection, bridge, runtime, websocket
+ *
+ * Exports:
+ * - bridgeConnectionLabel — 返回 label、className、description。
+ *
+ * Inward: 无外部模块；纯函数根据连接与 runtime 派生文案。
+ *
+ * Outward: TopBar、topbar-status 单测、状态点展示。
+ */
+
 const CONNECTION_STATUS = {
   connected: { label: '已连接', className: 'is-connected', description: 'CodexMobile 服务已连接。' },
   connecting: { label: '连接中', className: 'is-connecting', description: '正在连接 CodexMobile 服务。' },

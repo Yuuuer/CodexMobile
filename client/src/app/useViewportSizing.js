@@ -1,3 +1,17 @@
+/**
+ * 结合 `visualViewport` 与窗口尺寸计算 Composer 可用高度等指标，并在 resize/滚动时更新。
+ *
+ * Keywords: visual-viewport, composer-layout, mobile-keyboard
+ *
+ * Exports:
+ * - `viewportSizingMetrics` — 从度量对象导出量化 height/width/CSS 变量载荷。
+ * - `useViewportSizing` — 订阅视口变化并写回 ref 附带样式的 hook。
+ *
+ * Inward: 浏览器 `window.visualViewport` 与 `ResizeObserver`（如可用）。
+ *
+ * Outward: `App.jsx` 传给 Shell/Composer 区域布局。
+ */
+
 import { useEffect } from 'react';
 
 export function viewportSizingMetrics({

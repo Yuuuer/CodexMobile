@@ -1,3 +1,10 @@
+/**
+ * 测试 chat/activity-timeline-model.js：时间线正文项与技能步骤等展示规则。
+ * Keywords: activity-timeline, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: chat/activity-timeline-model.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

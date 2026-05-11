@@ -1,3 +1,10 @@
+/**
+ * 测试 app/useAppWebSocket.js：各类 WS 载荷是否应刷新线程或渲染本地消息。
+ * Keywords: websocket, payload-guards, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: app/useAppWebSocket.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

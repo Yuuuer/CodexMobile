@@ -1,3 +1,18 @@
+/**
+ * Web Push：订阅持久化、VAPID 配置与向客户端推送「需要输入」类通知。
+ *
+ * Keywords: web-push, vapid, notification, subscription
+ *
+ * Exports:
+ * - notificationFromServerPayload — 规范推送展示字段。
+ * - createPushService — 工厂，封装 web-push。
+ *
+ * Inward（本模块依赖/组装的关键符号）: web-push 包、本地 state 文件路径。
+ *
+ * Outward（谁在用/调用场景）: notification-routes、chat/codex 事件广播。
+ *
+ * 不负责: APNs/FCM 原生推送。
+ */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import webPushDefault from 'web-push';

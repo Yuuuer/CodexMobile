@@ -1,3 +1,16 @@
+/**
+ * 开发/本机启动器：加载 .env、应用系统代理，前台或后台 spawn Node 跑 server/index.js 并写日志。
+ *
+ * Keywords: dev-server, dotenv, spawn, logging, system-proxy
+ *
+ * Exports:
+ * - 无 default，CLI 自执行。
+ *
+ * Inward（本模块依赖/组装的关键符号）: system-proxy-env.mjs；.codexmobile 日志目录。
+ *
+ * Outward（谁在用/调用场景）: package.json start:bg；本地手动 node scripts/start-server.mjs。
+ */
+
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

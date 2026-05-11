@@ -1,3 +1,12 @@
+/**
+ * 测试桌面活动与 thread 投影：messagesFromDesktopThread、raw activities 合并。
+ *
+ * Keywords: codex-data, desktop-activity, test, thread
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: codex-data.js, desktop-thread-projector.js, desktop-activity-parser.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { messagesFromDesktopThread, rawSessionActivitiesFromJsonl } from './codex-data.js';

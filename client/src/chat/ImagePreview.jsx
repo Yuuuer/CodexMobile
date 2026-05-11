@@ -1,3 +1,16 @@
+/**
+ * 消息内嵌图片与用户图条、全屏预览浮层及缩放拖拽交互。
+ *
+ * Keywords: image preview, modal, zoom, GeneratedImage
+ *
+ * Exports:
+ * - GeneratedImage、UserImageStrip、ImagePreviewModal — 行内图、多条缩略图条与灯箱。
+ *
+ * Inward: ../app/session-utils（useResolvedImageSource）。
+ *
+ * Outward: ChatMessage.jsx、MarkdownContent.jsx
+ */
+
 import { Minus, Plus, RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useResolvedImageSource } from '../app/session-utils.js';

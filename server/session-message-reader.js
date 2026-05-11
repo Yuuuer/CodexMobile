@@ -1,3 +1,19 @@
+/**
+ * 读取 rollout/session JSONL，拼装消息列表、分页与桌面/协作活动投影入口。
+ *
+ * Keywords: session-messages, rollout-jsonl, pagination, desktop-thread
+ *
+ * Exports:
+ * - messagesFromRolloutJsonl / publicContextState / publicRuntimeState — 解析与脱敏视图。
+ * - readRolloutContextState / paginateMessages / isoFromEpochSeconds — IO 与分页工具。
+ * - createSessionMessageReader — 可注入 fs 与会话依赖的读数器。
+ *
+ * Inward（本模块依赖/组装的关键符号）: codex-app-server、desktop-activity-parser、desktop-thread-projector。
+ *
+ * Outward（谁在用/调用场景）: codex-data.readSessionMessages、API 层。
+ *
+ * 不负责: 写入会话文件。
+ */
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import readline from 'node:readline';

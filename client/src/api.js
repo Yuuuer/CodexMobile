@@ -1,3 +1,17 @@
+/**
+ * 带设备 Token 的 JSON API 封装与本地 Token 读写。
+ *
+ * Keywords: fetch, api, bearer-token, localStorage, timeout
+ *
+ * Exports:
+ * - getToken / setToken / clearToken — localStorage 中的设备 Token。
+ * - apiFetch — 统一 headers、超时与 JSON 体。
+ *
+ * Inward: fetch、localStorage。
+ *
+ * Outward: 客户端所有 REST 调用入口。
+ */
+
 const TOKEN_KEY = 'codexmobile.deviceToken';
 
 export function getToken() {

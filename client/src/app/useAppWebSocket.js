@@ -1,3 +1,17 @@
+/**
+ * WebSocket 入站处理：按桌面线程等来源过滤/合并状态与消息，并暴露 `useAppWebSocket` 建立连接与分发副作用。
+ *
+ * Keywords: websocket, desktop-thread, activity-sync, session-rename
+ *
+ * Exports:
+ * - 若干 `is*` / `should*` 纯函数 — 判定外部线程 payload、是否插入状态/活动/助手消息、重连后是否刷新等。
+ * - `useAppWebSocket` — 订阅 WS、应用 payload 到会话与 context 的 hook。
+ *
+ * Inward: `api`（REST 与 `websocketUrl`）、`session-live-refresh`、`activity-model`、`context-status`。
+ *
+ * Outward: `App.jsx` 根编排。
+ */
+
 import { apiFetch, getToken, websocketUrl } from '../api.js';
 import {
   applySessionRenameToProjectSessions

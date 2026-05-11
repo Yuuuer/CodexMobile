@@ -1,3 +1,20 @@
+/**
+ * 静态资源与本地图片/文本文件服务：MIME、缓存头、鉴权 local-image。
+ *
+ * Keywords: static-service, local-files, gzip, spa-fallback
+ *
+ * Exports:
+ * - DEFAULT_MIME_TYPES / EDITABLE_TEXT_EXTENSIONS。
+ * - resolveLocalImagePath / safeDecodeLocalPath / stripLocalFileLineSuffix。
+ * - sendLocalImage / sendLocalFile / writeLocalTextFile / serveFileFromRoot。
+ * - createStaticService — 组装根目录与缓存策略。
+ *
+ * Inward（本模块依赖/组装的关键符号）: http-utils.sendStaticContent、Node fs。
+ *
+ * Outward（谁在用/调用场景）: server/index 静态与 /api/local-* 路径。
+ *
+ * 不负责: 业务会话数据。
+ */
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';

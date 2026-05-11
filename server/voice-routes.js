@@ -1,3 +1,17 @@
+/**
+ * 语音相关 HTTP API：录音上传转写、TTS 与语音路由装配。
+ *
+ * Keywords: voice-routes, stt, tts, multipart-upload
+ *
+ * Exports:
+ * - createVoiceRouteHandler — 返回语音接口处理函数。
+ *
+ * Inward（本模块依赖/组装的关键符号）: http-utils、upload-service、voice-transcriber、voice-speaker。
+ *
+ * Outward（谁在用/调用场景）: server/index 挂载路由。
+ *
+ * 不负责: Realtime WebSocket 代理（见 realtime-voice）。
+ */
 import { readBody, sendJson } from './http-utils.js';
 import { readVoiceUpload as defaultReadVoiceUpload } from './upload-service.js';
 import { synthesizeSpeech as defaultSynthesizeSpeech } from './voice-speaker.js';

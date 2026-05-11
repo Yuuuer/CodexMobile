@@ -1,3 +1,10 @@
+/**
+ * 测试 composer-shortcuts.js：斜杠 token 检测、替换与指令过滤。
+ * Keywords: composer, slash-commands, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: composer-shortcuts.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

@@ -1,3 +1,17 @@
+/**
+ * 聊天发送侧回合队列：去重、限深与挂起 Codex 运行时的 session 关联。
+ *
+ * Keywords: chat-queue, turn-queue, recent-turns, session-binding
+ *
+ * Exports:
+ * - createChatQueue — 工厂，维护内存队列与泄漏防护。
+ *
+ * Inward（本模块依赖/组装的关键符号）: Node crypto（job id）、纯内存结构。
+ *
+ * Outward（谁在用/调用场景）: chat-service。
+ *
+ * 不负责: 持久化队列。
+ */
 import crypto from 'node:crypto';
 
 const DEFAULT_MAX_RECENT_TURNS = 80;

@@ -1,3 +1,19 @@
+/**
+ * CodexMobile 配对码、设备信任与 Bearer token 校验（HTTP/WebSocket）。
+ *
+ * Keywords: auth, pairing, bearer-token, trusted-devices
+ *
+ * Exports:
+ * - DATA_DIR — state 根目录。
+ * - initializeAuth / getPairingCode / getTrustedDeviceCount。
+ * - extractBearerToken / verifyToken / pairDevice。
+ *
+ * Inward（本模块依赖/组装的关键符号）: Node crypto/fs、.codexmobile/state JSON。
+ *
+ * Outward（谁在用/调用场景）: server/index、各需鉴权路由。
+ *
+ * 不负责: 第三方 OAuth。
+ */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';

@@ -1,3 +1,18 @@
+/**
+ * TTS：通过 OpenAI 兼容 speech API 或备选路径合成语音并落盘/返回 buffer。
+ *
+ * Keywords: tts, speech-synthesis, websocket, openai-compatible
+ *
+ * Exports:
+ * - speechMimeType / publicVoiceSpeechStatus — MIME 与状态摘要。
+ * - synthesizeSpeech — 主入口。
+ *
+ * Inward（本模块依赖/组装的关键符号）: provider-api、child_process、ws（部分路径）。
+ *
+ * Outward（谁在用/调用场景）: voice-routes、实时语音相关流程。
+ *
+ * 不负责: STT（见 voice-transcriber）。
+ */
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';

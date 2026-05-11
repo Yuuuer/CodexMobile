@@ -1,3 +1,12 @@
+/**
+ * 测试 server/chat-service.js：发送消息、队列与依赖注入路径。
+ *
+ * Keywords: chat-service, test, integration
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: chat-service.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createChatService } from './chat-service.js';

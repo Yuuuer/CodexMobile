@@ -1,3 +1,16 @@
+/**
+ * Composer 侧文件 @ 提及与技能多选状态，并持久化选中技能路径到 localStorage。
+ *
+ * Keywords: file mentions, skills, localStorage, composer state
+ *
+ * Exports:
+ * - useComposerSelections — 返回 mentions/技能选择与增删 API。
+ *
+ * Inward: ../app/session-utils.js（safeStoredJsonArray）、上层 status.skills。
+ *
+ * Outward: App.jsx 与 Composer.jsx
+ */
+
 import { useEffect, useState } from 'react';
 import { safeStoredJsonArray } from '../app/session-utils.js';
 

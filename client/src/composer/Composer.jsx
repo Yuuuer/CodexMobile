@@ -1,3 +1,17 @@
+/**
+ * 主聊天输入区：附件、模型/推理/权限/技能、剪贴板粘贴与发送流程。
+ *
+ * Keywords: composer, chat input, attachments, model, skills
+ *
+ * Exports:
+ * - DEFAULT_PERMISSION_MODE — re-export 默认权限模式常量。
+ * - Composer — 组合输入框与各下拉与状态控件的根组件。
+ *
+ * Inward: api、session-utils、composer-options、attachment-preview、paste-files、ContextStatus、Codex 快捷指令等。
+ *
+ * Outward: App.jsx 或上层布局挂载输入条处。
+ */
+
 import { ArrowUp, Bot, Check, ChevronDown, FileText, Image, Loader2, MessageSquare, MessageSquarePlus, Paperclip, Plus, Search, Shield, Square, Terminal, Trash2, Zap } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, getToken } from '../api.js';

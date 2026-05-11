@@ -1,3 +1,17 @@
+/**
+ * 文件类 HTTP 路由：上传、本地文件读取、项目内文件搜索等。
+ *
+ * Keywords: file-routes, multipart, local-file, file-search
+ *
+ * Exports:
+ * - createFileRouteHandler — 返回文件 API 处理函数。
+ *
+ * Inward（本模块依赖/组装的关键符号）: http-utils、file-search、upload-service。
+ *
+ * Outward（谁在用/调用场景）: server/index。
+ *
+ * 不负责: Git 与聊天业务。
+ */
 import { readBody, sendJson } from './http-utils.js';
 import { searchProjectFiles as defaultSearchProjectFiles } from './file-search.js';
 import { saveUpload as defaultSaveUpload } from './upload-service.js';

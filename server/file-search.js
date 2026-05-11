@@ -1,3 +1,18 @@
+/**
+ * 在项目根目录下用 git ls-files + 限定路径做轻量文件搜索。
+ *
+ * Keywords: file-search, git-ls-files, ripgrep-alternative
+ *
+ * Exports:
+ * - searchProjectFiles — 按 query 返回匹配路径列表。
+ * - fileSearchInternals — 测试用内部钩子。
+ *
+ * Inward（本模块依赖/组装的关键符号）: child_process.execFile、项目 cwd。
+ *
+ * Outward（谁在用/调用场景）: file-routes。
+ *
+ * 不负责: 内容级全文检索。
+ */
 import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';

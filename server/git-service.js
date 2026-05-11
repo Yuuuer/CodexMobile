@@ -1,3 +1,20 @@
+/**
+ * 封装 git 命令执行与会话内 Git 状态摘要、提交文案辅助。
+ *
+ * Keywords: git-service, child-process, git-status, diff
+ *
+ * Exports:
+ * - parseGitStatusShort — 解析 porcelain 状态。
+ * - normalizeBranchName / defaultCommitMessage — 分支与默认提交说明。
+ * - truncateGitOutput — 限制输出长度。
+ * - createGitService — 可注入 getProject 的 Git 服务。
+ *
+ * Inward（本模块依赖/组装的关键符号）: child_process execFile/spawn、cwd 自 getProject。
+ *
+ * Outward（谁在用/调用场景）: git-routes、测试。
+ *
+ * 不负责: 远程推送鉴权策略。
+ */
 import { execFile, spawn } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';

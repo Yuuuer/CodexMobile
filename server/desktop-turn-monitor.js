@@ -1,3 +1,17 @@
+/**
+ * 观测桌面 follower 回合进度，与移动端 run 状态对齐并 emit 事件。
+ *
+ * Keywords: desktop-turn-monitor, follower, codex-bridge, activity
+ *
+ * Exports:
+ * - createDesktopTurnMonitor — 工厂，聚合 IPC 与本地 run 状态。
+ *
+ * Inward（本模块依赖/组装的关键符号）: shared/message-identity、桌面 IPC 辅助。
+ *
+ * Outward（谁在用/调用场景）: chat-service 装配并在回合中订阅。
+ *
+ * 不负责: 解析桌面 thread JSON（见 desktop-thread-projector）。
+ */
 import { userMessageIdentity } from '../shared/message-identity.js';
 
 function normalizeText(value) {

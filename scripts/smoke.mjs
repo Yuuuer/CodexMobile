@@ -1,3 +1,16 @@
+/**
+ * 轻量健康检查：请求本机 CodexMobile /api/status，验证 connected 与 HTTP 成功。
+ *
+ * Keywords: smoke-test, health-check, api-status, CI
+ *
+ * Exports:
+ * - 无 default，脚本入口自执行。
+ *
+ * Inward（本模块依赖/组装的关键符号）: 全局 fetch；环境变量 CODEXMOBILE_URL。
+ *
+ * Outward（谁在用/调用场景）: package.json smoke 脚本。
+ */
+
 const url = process.env.CODEXMOBILE_URL || 'http://127.0.0.1:3321/api/status';
 
 try {

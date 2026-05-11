@@ -1,4 +1,16 @@
 #!/usr/bin/env node
+/**
+ * lark-cli 包装：阻止同一会话 turn 内重复执行 slides +create，并落盘创建尝试与大屏 ID。
+ *
+ * Keywords: lark-cli, slides, guard, duplicate-block, spawn-wrapper
+ *
+ * Exports:
+ * - 无 default，可执行入口 main。
+ *
+ * Inward（本模块依赖/组装的关键符号）: node:child_process spawn；环境 CODEXMOBILE_TURN_ID 等。
+ *
+ * Outward（谁在用/调用场景）: 工具调用中将真实 lark-cli 替换为此包装路径。
+ */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';

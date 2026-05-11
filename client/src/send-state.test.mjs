@@ -1,3 +1,10 @@
+/**
+ * 测试 send-state.js：Composer 发送禁用态与桌面桥模式文案。
+ * Keywords: send-state, composer, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: send-state.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { composerSendState } from './send-state.js';

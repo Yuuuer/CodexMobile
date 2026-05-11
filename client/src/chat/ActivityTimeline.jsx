@@ -1,3 +1,16 @@
+/**
+ * 渲染活动任务时间线：文本/实时态/分隔/子代理等节点及底部文件汇总。
+ *
+ * Keywords: activity timeline, lucide, markdown
+ *
+ * Exports:
+ * - ActivityTimeline — timeline 列表 + ActivityFileSummary。
+ *
+ * Inward: activity-timeline-model、ActivityFileSummary、MarkdownContent。
+ *
+ * Outward: ActivityMessage.jsx
+ */
+
 import { BookOpenCheck, Bot, CheckCircle2, FileText, Pencil, Play, Search, SquareTerminal } from 'lucide-react';
 import { useState } from 'react';
 import { ActivityFileSummary } from './ActivityFileSummary.jsx';

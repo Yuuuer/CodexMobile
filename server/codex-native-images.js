@@ -1,3 +1,19 @@
+/**
+ * Codex 原生生图路径的 Markdown 与 turn input 拼装，及 legacy/direct 模式开关。
+ *
+ * Keywords: codex-images, markdown, skill-input, legacy-mode
+ *
+ * Exports:
+ * - useLegacyImageGenerator — 环境变量决定走 legacy 路由与否。
+ * - buildCodexTurnInput — 将消息/技能等拼成 Codex input 列表。
+ * - imageMarkdownFromCodexImageGeneration — rollout 项转图片 Markdown。
+ *
+ * Inward（本模块依赖/组装的关键符号）: 无外部模块；仅 Node 内置与字面量工具函数。
+ *
+ * Outward（谁在用/调用场景）: chat-delivery、native image 测试、runner 相关逻辑。
+ *
+ * 不负责: 实际图片生成 API（由 Codex/CLI 执行）。
+ */
 function markdownImageDestination(value) {
   const raw = String(value || '').trim();
   if (!raw) {

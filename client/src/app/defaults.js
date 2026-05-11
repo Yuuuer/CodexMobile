@@ -1,3 +1,17 @@
+/**
+ * 应用初始状态快照：连接与桌面桥、默认模型与推理档位、文档集成占位、上下文窗口占位等常量对象。
+ *
+ * Keywords: default-status, initial-state, reasoning-effort
+ *
+ * Exports:
+ * - `DEFAULT_STATUS` — 完整默认 `status` 形状。
+ * - `DEFAULT_REASONING_EFFORT` / `REASONING_DEFAULT_VERSION` — 推理相关默认与版本标记。
+ *
+ * Inward: 无外部模块；纯数据定义。
+ *
+ * Outward: `App.jsx` bootstrap 与多处 hook 的基线状态。
+ */
+
 export const DEFAULT_STATUS = {
   connected: false,
   desktopBridge: {
@@ -49,7 +63,13 @@ export const DEFAULT_STATUS = {
       reason: ''
     }
   },
-  auth: { authenticated: false }
+  auth: { authenticated: false },
+  runtimeDebug: {
+    envEnabled: false,
+    uiEnabled: false,
+    enabled: false,
+    logRelativePath: '.codexmobile/logs/runtime-debug.jsonl'
+  }
 };
 
 export const DEFAULT_REASONING_EFFORT = 'xhigh';

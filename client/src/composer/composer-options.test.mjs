@@ -1,3 +1,13 @@
+/**
+ * 验证 composer-options：模型速度默认值、标签与 Codex service tier 映射。
+ *
+ * Keywords: composer-options, model speed, tests
+ *
+ * Exports: 无导出 / 内含用例
+ *
+ * Inward: composer-options.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

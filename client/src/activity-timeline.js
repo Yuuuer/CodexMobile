@@ -1,3 +1,16 @@
+/**
+ * 活动时间线占位项判断：隐藏尚无实质内容的泛型「一步操作」占位。
+ *
+ * Keywords: activity, timeline, placeholder, tool-step
+ *
+ * Exports:
+ * - isPlaceholderTimelineItem — 是否为可隐藏的占位 tool 项。
+ *
+ * Inward: 无。
+ *
+ * Outward: 活动卡片 / 时间线折叠展示。
+ */
+
 export function isPlaceholderTimelineItem(item = null) {
   if (!item || item.type !== 'tool') {
     return false;

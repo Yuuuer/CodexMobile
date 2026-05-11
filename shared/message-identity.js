@@ -1,3 +1,18 @@
+/**
+ * 用户消息的「语义身份」与图片签名：排除纯图片行后比对文本，并串联图片来源用于等价判断。
+ *
+ * Keywords: message-identity, userMessage, image-signature, dedupe, comparison
+ *
+ * Exports:
+ * - userMessageImageSignature — 正文内图片链接的稳定串联签名。
+ * - userMessageIdentity — 去掉图片行后的规范化文本。
+ * - sameUserMessageContent — 文本与图片签名一致则视为同一条用户输入。
+ *
+ * Inward（本模块依赖/组装的关键符号）: 无。
+ *
+ * Outward（谁在用/调用场景）: client chat/message-identity 再导出、session-live-refresh、useAppWebSocket；server desktop-turn-monitor。
+ */
+
 function normalizeWhitespace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }

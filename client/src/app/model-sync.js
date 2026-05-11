@@ -1,3 +1,16 @@
+/**
+ * 将服务端 `status` 中的模型与推理档位与用户本地选择对齐：仅在「服务端从旧值变为新值」时覆盖本地，避免编辑中途被意外重置。
+ *
+ * Keywords: model-sync, reasoning-effort, status-reconcile
+ *
+ * Exports:
+ * - `nextSyncedComposerSettings` — 基于当前/上一次 status 计算下一组 `model` 与 `reasoningEffort`。
+ *
+ * Inward: 无外部模块；纯比较逻辑。
+ *
+ * Outward: `App.jsx` 在 status 更新后同步 Composer 选项。
+ */
+
 function clean(value) {
   return String(value || '').trim();
 }

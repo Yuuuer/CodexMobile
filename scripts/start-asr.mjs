@@ -1,3 +1,16 @@
+/**
+ * 拉取/构建并运行本地 SenseVoice ASR Docker 容器，供语音转写使用。
+ *
+ * Keywords: asr, docker, SenseVoice, transcribe, devops
+ *
+ * Exports:
+ * - 无 default，CLI 自执行。
+ *
+ * Inward（本模块依赖/组装的关键符号）: docker CLI；asr-service 目录与模型缓存路径。
+ *
+ * Outward（谁在用/调用场景）: package.json asr:start。
+ */
+
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

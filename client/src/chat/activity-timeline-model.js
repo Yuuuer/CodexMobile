@@ -1,3 +1,16 @@
+/**
+ * 将原始 activity steps 聚合为时间线节点、文件汇总与分块展示所需数据结构。
+ *
+ * Keywords: activity timeline, steps aggregation, file summary
+ *
+ * Exports:
+ * - activityTimeRange、buildActivityTimeline、buildActivityFileSummary、activityDetailText、hasActivityStepDetail、activityBodyItemsForDisplay、activityStepDetailTitle、isSkillActivityStep 等。
+ *
+ * Inward: ../activity-display、./activity-model（文案与思考步骤折叠）。
+ *
+ * Outward: activity-timeline-projection.js、ActivityTimeline.jsx
+ */
+
 import { isThinkingActivityStep, thinkingActivityText } from '../activity-display.js';
 import { compactActivityText, conciseActivityDetail, isGenericActivityLabel } from './activity-model.js';
 

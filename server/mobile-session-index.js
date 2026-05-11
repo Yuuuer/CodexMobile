@@ -1,3 +1,18 @@
+/**
+ * 纯移动端会话（无桌面 rollout）的 JSON 索引：列出/读写/重命名/删除。
+ *
+ * Keywords: mobile-session, local-index, projectless-mobile
+ *
+ * Exports:
+ * - readMobileSessionIndex / readMobileSessions / readMobileSessionMessages。
+ * - deleteMobileSession / registerMobileSession / renameMobileSession。
+ *
+ * Inward（本模块依赖/组装的关键符号）: .codexmobile/state/mobile-sessions.json、shared/session-title。
+ *
+ * Outward（谁在用/调用场景）: codex-data 合并索引、image-generator 登记消息。
+ *
+ * 不负责: Codex 桌面 session 文件。
+ */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

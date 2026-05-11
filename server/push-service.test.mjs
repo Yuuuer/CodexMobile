@@ -1,3 +1,12 @@
+/**
+ * 测试 server/push-service.js：订阅校验、落盘与 notification 载荷。
+ *
+ * Keywords: push-service, test, web-push
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: push-service.js
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';

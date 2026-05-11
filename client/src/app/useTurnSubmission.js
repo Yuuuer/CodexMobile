@@ -1,3 +1,16 @@
+/**
+ * 封装用户回合提交：校验选择、拼装请求、乐观更新消息列表、错误与中断处理及必要时轮询 turn 状态。
+ *
+ * Keywords: turn-submission, optimistic-ui, session-messages, composer-send
+ *
+ * Exports:
+ * - `useTurnSubmission` — 绑定发送/队列所需状态与回调的 React hook。
+ *
+ * Inward: `api`；会话与活动合并逻辑（`session-utils`、`turn-submission-utils`、`activity-model`、`context-status`）。
+ *
+ * Outward: `App.jsx` 根组件注入 Composer 与聊天侧发送行为。
+ */
+
 import { apiFetch } from '../api.js';
 import { contentWithAttachmentPreviews } from '../chat/MarkdownContent.jsx';
 import { serviceTierForModelSpeed } from '../composer/composer-options.js';
@@ -307,9 +320,6 @@ export function useTurnSubmission({
     };
     setMessages((current) => {
       const next = [...current, localUserMessage];
-      if (!draftSessionId || outgoingSessionId) {
-        return next;
-      }
       return upsertStatusMessage(next, localHandoffStatusPayload({
         sessionId: optimisticSessionId,
         previousSessionId: draftSessionId,

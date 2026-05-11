@@ -1,3 +1,20 @@
+/**
+ * 从 Codex config.toml 等读取 OpenAI 兼容 API 与 CLI 代理密钥，供标题/配图等调用。
+ *
+ * Keywords: provider-api, openai-compatible, codex-config, api-key
+ *
+ * Exports:
+ * - DEFAULT_OPENAI_COMPATIBLE_BASE_URL — 默认本机 CLI 代理地址。
+ * - normalizeBaseUrl — URL规整。
+ * - readCodexProviderBaseUrl / readCliProxyApiKeys — 读取配置。
+ * - openAICompatibleConfig — 组装 fetch 用 baseURL 与 headers。
+ *
+ * Inward（本模块依赖/组装的关键符号）: codex-config（CODEX_CONFIG_PATH）、node:fs。
+ *
+ * Outward（谁在用/调用场景）: session-title-generator、voice、image-generator 等。
+ *
+ * 不负责: 实际 HTTP 请求重试策略。
+ */
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';

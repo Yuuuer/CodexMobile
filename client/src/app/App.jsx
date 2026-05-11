@@ -1,3 +1,19 @@
+/**
+ * CodexMobile Web：根级应用编排——认证门禁、服务端状态与 WS、会话域数据流、把 props 下发给 Shell。
+ *
+ * Keywords: pairing, websocket, bootstrap, session-orchestration, composer-props
+ *
+ * Exports:
+ * - default — `App`（入口挂载的根组件）。
+ *
+ * Inward（本模块组装）: `PairingScreen`, `AppShell`；多处 `use*` hooks（bootstrap / session / submit / runtime / uploads 等）；
+ *   `session-utils`、`api`、`AppState` reducer。
+ *
+ * Outward（谁消费）: 应用入口（如 `main`）仅挂载本 default；DOM 拼装见 `AppShell.jsx`。
+ *
+ * 不负责: 页面区域的具体布局与样式、`Composer`/`ChatPane` 内部交互实现。
+ */
+
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { apiFetch, getToken } from '../api.js';
 import { DEFAULT_PERMISSION_MODE } from '../composer/Composer.jsx';
@@ -610,7 +626,9 @@ export default function App() {
     onSync: handleSync,
     syncing,
     theme,
-    setTheme
+    setTheme,
+    runtimeDebug: status.runtimeDebug,
+    refreshStatus: loadStatus
   };
   const chatProps = {
     messages,

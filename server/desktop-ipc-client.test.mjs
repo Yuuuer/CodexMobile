@@ -1,3 +1,12 @@
+/**
+ * 测试 server/desktop-ipc-client.js：IPC socket、方法版本与探测行为。
+ *
+ * Keywords: desktop-ipc, test, unix-socket
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: desktop-ipc-client.js
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import net from 'node:net';

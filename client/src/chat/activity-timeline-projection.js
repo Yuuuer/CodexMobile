@@ -1,3 +1,17 @@
+/**
+ * 将 activity steps 投影为带工具爆发展开的 timeline，并返回时间范围与文件汇总。
+ *
+ * Keywords: activity projection, tool burst, timeline
+ *
+ * Exports:
+ * - TOOL_BURST_VISIBLE_COUNT — 单次可见工具调用条数常量。
+ * - projectActivityView、projectActivityTimeline — 组装视图数据。
+ *
+ * Inward: ./activity-timeline-model.js
+ *
+ * Outward: ActivityMessage.jsx
+ */
+
 import {
   activityTimeRange,
   buildActivityFileSummary,

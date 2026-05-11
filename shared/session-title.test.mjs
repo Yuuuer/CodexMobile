@@ -1,3 +1,13 @@
+/**
+ * 测试 shared/session-title.js：临时标题与会话综合标题提炼。
+ *
+ * Keywords: session-title, provisionalSessionTitle, sessionTitleFromConversation, node:test
+ *
+ * Exports: 无导出 / 内含用例
+ *
+ * Inward: session-title.js
+ */
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

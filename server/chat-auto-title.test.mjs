@@ -1,3 +1,12 @@
+/**
+ * 测试 server/chat-auto-title.js：自动命名刷新、广播与会话锁定位。
+ *
+ * Keywords: chat-auto-title, test
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: chat-auto-title.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createChatAutoNamer } from './chat-auto-title.js';

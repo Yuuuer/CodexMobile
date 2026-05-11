@@ -1,3 +1,12 @@
+/**
+ * 测试 server/codex-native-images.js：legacy 模式、turn input 与 Markdown。
+ *
+ * Keywords: codex-native-images, test, markdown
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: codex-native-images.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

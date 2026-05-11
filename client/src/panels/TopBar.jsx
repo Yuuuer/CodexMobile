@@ -1,3 +1,17 @@
+/**
+ * 主顶栏：会话标题、连接状态、菜单、文档 / Git 快捷入口与线程 ID 复制等。
+ *
+ * Keywords: topbar, header, git, docs, notifications
+ *
+ * Exports:
+ * - TopBar — 顶栏组件。
+ * - bridgeConnectionLabel — 自 topbar-status 再导出。
+ *
+ * Inward: clipboard、session-utils、DocsPanel、topbar-status；lucide-react。
+ *
+ * Outward: App 根布局顶部固定区域。
+ */
+
 import { Bell, Check, Copy, FileText, GitBranch, GitCommitHorizontal, Menu, MoreHorizontal, RefreshCw, UploadCloud, Wifi } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { copyTextToClipboard } from '../utils/clipboard.js';

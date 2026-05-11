@@ -1,3 +1,12 @@
+/**
+ * 测试 server/chat-request-prep.js：无项目工作目录与请求体规范化。
+ *
+ * Keywords: chat-request-prep, test, projectless
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: chat-request-prep.js
+ */
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import test from 'node:test';

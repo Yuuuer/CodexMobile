@@ -1,3 +1,12 @@
+/**
+ * 测试 server/codex-app-server.js：传输层解析与桌面 socket 可用性。
+ *
+ * Keywords: codex-app-server, test, transport
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: codex-app-server.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolveAppServerTransport } from './codex-app-server.js';

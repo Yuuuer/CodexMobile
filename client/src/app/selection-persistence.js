@@ -1,3 +1,18 @@
+/**
+ * 记住用户上次选中的项目与会话：读写 localStorage，并在项目/会话列表加载后解析为首选选中项。
+ *
+ * Keywords: selection-persistence, localStorage, session-memory
+ *
+ * Exports:
+ * - `SELECTED_PROJECT_KEY` / `SELECTED_SESSION_KEY` — storage 键常量。
+ * - `readStoredSelection`、`rememberSelectedSession` — 读写给定 storage。
+ * - `preferredProjectFromStoredSelection`、`selectedSessionFromStoredSelection` — 从列表中匹配可恢复项。
+ *
+ * Inward: `localStorage`（可注入）。
+ *
+ * Outward: `useAppBootstrap`、`App.jsx` 在切换会话时持久化。
+ */
+
 export const SELECTED_PROJECT_KEY = 'codexmobile.selectedProjectId';
 export const SELECTED_SESSION_KEY = 'codexmobile.selectedSessionId';
 

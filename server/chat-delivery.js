@@ -1,3 +1,21 @@
+/**
+ * 聊天投递层：桌面桥校验、Unix/socket IPC 送信与无桌面时的 headless 队列。
+ *
+ * Keywords: desktop-ipc, headless-codex, bridge, codex-turn-input
+ *
+ * Exports:
+ * - assertDesktopBridgeAvailable — 校验桌面桥是否可用。
+ * - desktopIpcCanUseBackgroundFallback — 是否允许后台 fallback。
+ * - backgroundFallbackBridge — 构造 fallback descriptors。
+ * - sendViaDesktopIpc — 经桌面转发用户回合。
+ * - runQueuedHeadlessChatJob — 排队执行后台 Codex。
+ *
+ * Inward（本模块依赖/组装的关键符号）: codex-native-images（buildCodexTurnInput）、desktop-ipc-client、codex-runner。
+ *
+ * Outward（谁在用/调用场景）: chat-service。
+ *
+ * 不负责: HTTP 层与路由注册。
+ */
 import { buildCodexTurnInput } from './codex-native-images.js';
 
 export async function assertDesktopBridgeAvailable(getDesktopBridgeStatus) {

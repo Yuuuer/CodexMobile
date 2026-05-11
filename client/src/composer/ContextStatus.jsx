@@ -1,3 +1,17 @@
+/**
+ * 渲染上下文占用环形指示与弹层详情，供 Composer 展示 token 窗口与压缩状态。
+ *
+ * Keywords: context window, token usage, ring chart, popover
+ *
+ * Exports:
+ * - ContextStatusDetails — 上下文百分比、剩余量与自动压缩说明。
+ * - ContextStatusButton — 触发详情切换的按钮（含紧凑形态）；无 default。
+ *
+ * Inward: ../app/context-status.js（formatTokenCount、normalizeContextStatus 等）。
+ *
+ * Outward: Composer.jsx
+ */
+
 import { formatTokenCount, normalizeContextStatus, numberOrNull } from '../app/context-status.js';
 
 const RING_SIZE = 22;

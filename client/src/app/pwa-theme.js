@@ -1,3 +1,18 @@
+/**
+ * PWA 主题元数据与 DOM 应用：规范化 light/dark/system，写入 `meta theme-color` 与根节点 `data-theme*`。
+ *
+ * Keywords: pwa-theme, theme-color, prefers-color-scheme
+ *
+ * Exports:
+ * - `PWA_THEME_META` — 亮/暗下浏览器顶栏配色与状态栏样式。
+ * - `normalizePwaTheme` / `resolvePwaTheme` — 偏好解析（含 system）。
+ * - `applyPwaTheme` — 更新 `document` 与 meta 标签。
+ *
+ * Inward: 浏览器 `document` / `matchMedia`。
+ *
+ * Outward: `App.jsx`、`FilePreviewApp` 等于载入时统一视觉与 OEM 顶栏。
+ */
+
 export const PWA_THEME_META = {
   light: {
     themeColor: '#f7f7f4',

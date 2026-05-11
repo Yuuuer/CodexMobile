@@ -1,3 +1,19 @@
+/**
+ * 客户端会话域工具集：时间路径格式化、本地文件/图片 URL、草稿与列表合并、桌面 thread runtime 判定与 reconciler、Composer 运行态与轮次可见性。
+ *
+ * Keywords: session-utils, draft-session, thread-runtime, running-activity, composer-status
+ *
+ * Exports:
+ * - 通用与展示 — `formatTime`、`formatDuration*`、`subAgentRoleLabel`、`compactPath`、`safeStoredJsonArray` 等。
+ * - 上下文与媒体 — `emptyContextStatus`、`imageUrlWithRetry`、本地源与 `local*ApiPath`、`dataImageObjectUrl`、`useResolvedImageSource`。
+ * - 会话生命周期 — `createClientTurnId`、`createDraftSession`、`resolveNewConversationProject`、`isDraftSession`、`sessionMessagesApiPath`、标题补丁、`upsertSessionInProject`。
+ * - Runtime — `payloadRunKeys`、`selectedRunKeys`、`externalThreadRuntimeById`、`reconcileThreadRuntimeWithSessions`、`is*Runtime`、`should*`、`runningByIdWithSelectedActivity`、`sessionRunBadgeState`、`buildComposerRunStatus`、`selectedSessionIsRunning`、`hasVisibleAssistantForTurn` 等。
+ *
+ * Inward: `api`（blob）；`context-status`；`shared/session-title`。
+ *
+ * Outward: `App`、`useTurnSubmission`、`useTurnRuntime`、`useSessionActions`、panels、chat、composer、live refresh 等。
+ */
+
 import { useEffect, useState } from 'react';
 import { apiBlobFetch } from '../api.js';
 import { normalizeContextStatus } from './context-status.js';
@@ -366,13 +382,13 @@ export function isPersistentDesktopThreadRuntime(runtime) {
 }
 
 export function shouldClearRuntimeWhenNoActiveRuns(runtime) {
-  return runtime?.status === 'running' && !isPersistentDesktopThreadRuntime(runtime);
+  return runtime?.status === 'running' && !isExternalThreadRuntime(runtime);
 }
 
 export function externalThreadRuntimeById(threadRuntimeById = {}) {
   const next = {};
   for (const [key, runtime] of Object.entries(threadRuntimeById || {})) {
-    if (isPersistentDesktopThreadRuntime(runtime)) {
+    if (isExternalThreadRuntime(runtime)) {
       next[key] = runtime;
     }
   }
@@ -486,7 +502,10 @@ export function shouldDropRunningActivityWhenNoActiveRuns(message) {
   if (message?.transient) {
     return false;
   }
-  return String(message?.kind || '') !== 'desktop';
+  if (String(message?.kind || '') === 'desktop') {
+    return false;
+  }
+  return !isExternalThreadRuntimeSource(message?.source);
 }
 
 export function shouldDropRunningActivityMissingFromActiveRuns(message, activeRunKeys = new Set()) {

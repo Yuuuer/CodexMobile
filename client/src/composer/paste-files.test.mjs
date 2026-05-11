@@ -1,3 +1,13 @@
+/**
+ * 验证 paste-files：剪贴板 files/items 合并与去重行为。
+ *
+ * Keywords: paste-files, clipboard, tests
+ *
+ * Exports: 无导出 / 内含用例
+ *
+ * Inward: paste-files.js
+ */
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

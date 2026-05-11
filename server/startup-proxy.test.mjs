@@ -1,3 +1,12 @@
+/**
+ * 测试 scripts/system-proxy-env.mjs：macOS scutil 输出解析与环境变量检测。
+ *
+ * Keywords: system-proxy, scutil, test
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: ../scripts/system-proxy-env.mjs
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { hasExplicitProxyEnv, proxyUrlFromScutilOutput } from '../scripts/system-proxy-env.mjs';

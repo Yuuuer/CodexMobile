@@ -1,3 +1,18 @@
+/**
+ * 汇总 Codex / CLIProxy 等配额与用量信息，供状态 API 与 UI 展示。
+ *
+ * Keywords: codex-quota, cliproxy, usage, openai-account
+ *
+ * Exports:
+ * - getCodexQuota — 异步拉取并规整配额对象。
+ * - quotaTestHooks — 测试注入钩子。
+ *
+ * Inward（本模块依赖/组装的关键符号）: Node https/http、本地配置文件路径、spawnSync 探测。
+ *
+ * Outward（谁在用/调用场景）: server/index 状态接口、客户端状态栏。
+ *
+ * 不负责: 鉴权或代用户充值。
+ */
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';

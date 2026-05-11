@@ -1,3 +1,12 @@
+/**
+ * 测试 server/git-service.js：状态解析、分支名、提交文案与输出截断。
+ *
+ * Keywords: git-service, test, porcelain
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: git-service.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

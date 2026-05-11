@@ -1,3 +1,17 @@
+/**
+ * Composer 下拉选项常量与标签/格式化辅助（权限、推理、模型速度、字节与技能摘要）。
+ *
+ * Keywords: composer options, permission, reasoning, model speed, formatBytes
+ *
+ * Exports:
+ * - 常量：PERMISSION_OPTIONS、DEFAULT_PERMISSION_MODE、MODEL_SPEED_OPTIONS、REASONING_OPTIONS、DEFAULT_MODEL_SPEED。
+ * - formatBytes、shortModelName、permissionLabel、reasoningLabel、normalizeModelSpeed、modelSpeedLabel、serviceTierForModelSpeed、selectedSkillSummary。
+ *
+ * Inward: 无外部模块，纯数据与字符串处理。
+ *
+ * Outward: Composer.jsx、相关会话提交参数组装。
+ */
+
 export const PERMISSION_OPTIONS = [
   { value: 'default', label: '默认权限' },
   { value: 'acceptEdits', label: '自动接受编辑' },

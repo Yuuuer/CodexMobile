@@ -1,3 +1,16 @@
+/**
+ * 解析 Codex 消息中的 `<oai-mem-citation>` 块并格式化行号与 rollout id 展示。
+ *
+ * Keywords: memory citation, oai-mem-citation, rollout, parsing
+ *
+ * Exports:
+ * - splitMemoryCitationBlock、formatCitationLines、shortRolloutId — 文本拆分与展示辅助。
+ *
+ * Inward: 无外部模块依赖。
+ *
+ * Outward: MarkdownContent.jsx
+ */
+
 export function splitMemoryCitationBlock(content) {
   const value = String(content || '');
   const blocks = [];

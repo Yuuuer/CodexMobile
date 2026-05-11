@@ -1,3 +1,18 @@
+/**
+ * 轻量 UI 状态机：侧栏、预览、文档面板、Git 面板、Toast、主题等纯客户端 reducer 与初始状态。
+ *
+ * Keywords: ui-state, reducer, theme-preference
+ *
+ * Exports:
+ * - `THEME_KEY` — localStorage 中主题偏好键名。
+ * - `createInitialUiState` — 从 storage 读取主题等字段构造初始 state。
+ * - `appReducer` — `ui/*` action 分发的 reducer。
+ *
+ * Inward: `localStorage`（可注入）。
+ *
+ * Outward: `App.jsx` 与依赖 `THEME_KEY` 的面板/预览组件。
+ */
+
 export const THEME_KEY = 'codexmobile.theme';
 const THEME_VALUES = new Set(['light', 'dark', 'system']);
 

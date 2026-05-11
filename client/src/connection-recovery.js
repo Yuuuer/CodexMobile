@@ -1,3 +1,16 @@
+/**
+ * 根据鉴权、连接态与桌面桥推导出连接恢复卡片的文案与主/次操作类型。
+ *
+ * Keywords: connection, recovery, desktop-bridge, pairing, syncing
+ *
+ * Exports:
+ * - connectionRecoveryState — 返回 state、title、detail、primary/secondaryAction 等。
+ *
+ * Inward: 无。
+ *
+ * Outward: ConnectionRecoveryCard、全局连接 UX。
+ */
+
 export function connectionRecoveryState({
   authenticated = true,
   connectionState = 'connected',

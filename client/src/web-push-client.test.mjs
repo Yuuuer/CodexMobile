@@ -1,3 +1,10 @@
+/**
+ * 测试 web-push-client.js：VAPID 解码、环境支持与开通提示文案。
+ * Keywords: web-push, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: web-push-client.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

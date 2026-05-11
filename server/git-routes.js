@@ -1,3 +1,17 @@
+/**
+ * Git 相关 HTTP API：状态、diff、分支、提交与简单仓库操作。
+ *
+ * Keywords: git-routes, rest-api, git-service
+ *
+ * Exports:
+ * - createGitRouteHandler — 需注入 gitService。
+ *
+ * Inward（本模块依赖/组装的关键符号）: http-utils、git-service 实例。
+ *
+ * Outward（谁在用/调用场景）: server/index。
+ *
+ * 不负责: GitService 内 subprocess 细节。
+ */
 import { readBody, sendJson } from './http-utils.js';
 
 function sendGitError(res, error, fallback = 'Git operation failed') {

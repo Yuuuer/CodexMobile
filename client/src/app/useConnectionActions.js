@@ -1,3 +1,16 @@
+/**
+ * 连接与用户会话操作：登出清除 token、同步桌面桥、刷新状态与项目列表等聚合回调。
+ *
+ * Keywords: connection-actions, logout, sync, bridge
+ *
+ * Exports:
+ * - `useConnectionActions` — 返回连接/同步相关 `handle*` 的 hook。
+ *
+ * Inward: `api`（经 props 注入 `apiFetch` 等）、panels 中的桥接展示文案。
+ *
+ * Outward: `App.jsx` TopBar 与恢复卡片等。
+ */
+
 import { clearToken } from '../api.js';
 import { bridgeConnectionLabel } from '../panels/index.js';
 

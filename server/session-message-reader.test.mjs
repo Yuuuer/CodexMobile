@@ -1,3 +1,12 @@
+/**
+ * 测试 server/session-message-reader.js：rollout 解析、分页与上下文状态。
+ *
+ * Keywords: session-message-reader, test, jsonl
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: session-message-reader.js
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';

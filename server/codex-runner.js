@@ -1,3 +1,19 @@
+/**
+ * 启动与管理 Codex CLI 子进程，解析流式输出并驱动一轮对话回合。
+ *
+ * Keywords: codex-runner, subprocess, streaming, abort, steer
+ *
+ * Exports:
+ * - statusLabel / shouldCompleteTurnFromAppServerItem — 状态与回合完成判定辅助。
+ * - runCodexTurn — 主演示路径：跑一轮 Codex。
+ * - abortCodexTurn / getActiveRuns / steerCodexTurn — 控制运行中回合。
+ *
+ * Inward（本模块依赖/组装的关键符号）: Node child_process、服务层配置、runtime-debug。
+ *
+ * Outward（谁在用/调用场景）: chat-delivery、push、状态 API。
+ *
+ * 不负责: HTTP 请求解析。
+ */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -805,6 +821,7 @@ export async function runCodexTurn({ sessionId, draftSessionId, projectPath, mes
     startedAt: new Date().toISOString(),
     status: 'running'
   };
+  activeRuns.set(turnId, run);
 
   let currentSessionId = sessionId || null;
   let previousSessionId = draftSessionId || sessionId || null;
@@ -925,8 +942,6 @@ export async function runCodexTurn({ sessionId, draftSessionId, projectPath, mes
     run.thread = desktopThread;
     run.client = client;
     run.sessionId = currentSessionId;
-    activeRuns.set(turnId, run);
-
     emit({
       type: 'chat-started',
       sessionId: currentSessionId,

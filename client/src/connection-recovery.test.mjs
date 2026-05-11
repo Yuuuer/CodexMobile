@@ -1,3 +1,10 @@
+/**
+ * 测试 connection-recovery.js：连接恢复卡片状态机映射。
+ * Keywords: connection-recovery, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: connection-recovery.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { connectionRecoveryState } from './connection-recovery.js';

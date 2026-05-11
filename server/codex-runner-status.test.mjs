@@ -1,3 +1,12 @@
+/**
+ * 测试 server/codex-runner.js：statusLabel 与回合完成判定辅助。
+ *
+ * Keywords: codex-runner, test, status
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: codex-runner.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { shouldCompleteTurnFromAppServerItem, statusLabel } from './codex-runner.js';

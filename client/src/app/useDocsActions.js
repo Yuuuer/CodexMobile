@@ -1,3 +1,16 @@
+/**
+ * 飞书/文档集成操作：连接、断开、触发 CLI 技能安装检查等，并与全局 `status.docs` 同步。
+ *
+ * Keywords: feishu-docs, lark-cli, docs-panel
+ *
+ * Exports:
+ * - `useDocsActions` — 返回文档相关异步 `handle*` 的 hook。
+ *
+ * Inward: `api`；父级传入的 `setStatus`、`loadStatus` 等。
+ *
+ * Outward: `App.jsx` 文档面板与设置入口。
+ */
+
 import { apiFetch } from '../api.js';
 
 export function useDocsActions({

@@ -222,6 +222,12 @@
   line-height: 16px;
 }
 
+.theme-setting-title small.runtime-debug-error {
+  display: block;
+  margin-top: 8px;
+  color: var(--danger);
+}
+
 .theme-segment {
   display: grid;
   grid-template-columns: 1fr 1fr;

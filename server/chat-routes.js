@@ -1,3 +1,17 @@
+/**
+ * 注册 `/api/chat` 等聊天相关 HTTP 路由工厂。
+ *
+ * Keywords: chat-routes, http-handler, streaming
+ *
+ * Exports:
+ * - createChatRouteHandler — 返回挂载聊天 API 的处理函数。
+ *
+ * Inward（本模块依赖/组装的关键符号）: http-utils、注入的 chatService 等。
+ *
+ * Outward（谁在用/调用场景）: server/index 装配路由。
+ *
+ * 不负责: ChatService 内部实现。
+ */
 import { readBody, sendJson } from './http-utils.js';
 
 export function createChatRouteHandler({

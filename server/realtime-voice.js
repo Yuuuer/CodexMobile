@@ -1,3 +1,18 @@
+/**
+ * 浏览器 WebSocket 与 OpenAI/火山/通义等 Realtime 语音网关的双向代理。
+ *
+ * Keywords: realtime-voice, websocket, openai-realtime, proxy
+ *
+ * Exports:
+ * - publicVoiceRealtimeStatus — 对外可展示的配置摘要。
+ * - startVoiceRealtimeProxy — 在 `/ws/realtime` 上桥接客户端与上游。
+ *
+ * Inward（本模块依赖/组装的关键符号）: `ws` 库、多厂商 API URL 与模型常量。
+ *
+ * Outward（谁在用/调用场景）: server/index upgrade 处理。
+ *
+ * 不负责: 录音文件上传转写（见 voice-transcriber）。
+ */
 import WebSocket from 'ws';
 
 const OPENAI_REALTIME_BASE_URL = 'https://api.openai.com/v1';

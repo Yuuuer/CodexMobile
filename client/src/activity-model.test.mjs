@@ -1,3 +1,10 @@
+/**
+ * 测试 chat/activity-model.js：活动/助手/状态消息的 upsert 与占位判定。
+ * Keywords: activity-model, messages, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: chat/activity-model.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

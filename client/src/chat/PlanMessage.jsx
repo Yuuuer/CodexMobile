@@ -1,3 +1,16 @@
+/**
+ * 计划类气泡：计划请求卡片与可折叠计划正文（复制、实施/调整入口）。
+ *
+ * Keywords: plan message, plan card, markdown
+ *
+ * Exports:
+ * - PlanMessage — 根据 role 渲染 plan_request 或计划卡片。
+ *
+ * Inward: session-utils、MarkdownContent、clipboard。
+ *
+ * Outward: ChatMessage.jsx
+ */
+
 import { Check, CheckCircle2, ChevronDown, Copy, CornerDownLeft, Play, SendHorizontal } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { formatTime } from '../app/session-utils.js';

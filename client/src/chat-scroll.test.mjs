@@ -1,3 +1,10 @@
+/**
+ * 测试 chat-scroll.js：钉底判定与跟随输出策略。
+ * Keywords: chat-scroll, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: chat-scroll.js
+ */
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

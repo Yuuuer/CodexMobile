@@ -1,3 +1,16 @@
+/**
+ * PDF.js 驱动的页内预览：worker 配置、分页/缩放/适配宽度渲染与错误展示。
+ *
+ * Keywords: pdfjs, canvas-preview, pdf-worker
+ *
+ * Exports:
+ * - `PdfPreview` — 以二进制 `data` 或 `fileUrl` 为源的预览组件。
+ *
+ * Inward: `pdfjs-dist`（含 bundler 解析的 worker URL）。
+ *
+ * Outward: `FilePreviewApp` 等文件预览壳。
+ */
+
 import { ChevronLeft, ChevronRight, ExternalLink, Maximize2, Minus, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as pdfjs from 'pdfjs-dist';

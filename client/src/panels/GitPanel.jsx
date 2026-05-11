@@ -1,3 +1,16 @@
+/**
+ * Git 操作侧栏：分支 / 提交 / 推送 / PR 草稿等与后端 Git API 对接的移动端面板。
+ *
+ * Keywords: git, branch, commit, push, diff, worktree
+ *
+ * Exports:
+ * - GitPanel — Git 面板组件。
+ *
+ * Inward: apiFetch、git-panel-actions、git-panel-state、clipboard；lucide-react。
+ *
+ * Outward: App / TopBar 在打开 Git 抽屉时使用。
+ */
+
 import { Check, ChevronLeft, Copy, ExternalLink, FileText, FolderGit2, GitBranch, GitCommitHorizontal, GitPullRequest, Loader2, Plus, RefreshCw, UploadCloud, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../api.js';

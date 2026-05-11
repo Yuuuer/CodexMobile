@@ -1,3 +1,10 @@
+/**
+ * 测试 git-panel-state.js：改动计数、安全警告与动作拦阻原因。
+ * Keywords: git-state, safety, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: git-panel-state.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { gitActionBlockReason, gitChangedFileCount, gitSafetyWarnings } from './git-panel-state.js';

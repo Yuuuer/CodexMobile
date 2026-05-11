@@ -1,3 +1,12 @@
+/**
+ * 测试 server/session-title-generator.js：标题清洗、生成与条件重命名。
+ *
+ * Keywords: session-title, test, openai-compatible
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: session-title-generator.js
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

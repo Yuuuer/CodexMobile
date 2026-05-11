@@ -1,3 +1,12 @@
+/**
+ * 测试多类 HTTP route handler：chat/feishu/file/notification/session/voice。
+ *
+ * Keywords: route-handlers, test, http
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: chat-routes.js, feishu-routes.js, file-routes.js, notification-routes.js, session-routes.js, voice-routes.js
+ */
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';

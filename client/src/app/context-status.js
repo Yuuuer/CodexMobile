@@ -1,3 +1,18 @@
+/**
+ * Context 窗口与 token 计量：格式化展示、把服务端多种字段名归一化为单一结构，并在轮询/WS 更新时深度合并。
+ *
+ * Keywords: context-window, token-count, merge-status
+ *
+ * Exports:
+ * - `numberOrNull` / `formatTokenCount` — 数值清洗与缩写展示。
+ * - `normalizeContextStatus` — 将任意 payload 规整为内部 context 形状（含 autoCompact）。
+ * - `mergeContextStatus` — 合并增量更新与配置中的默认窗宽。
+ *
+ * Inward: 无 IO；纯数据变换。
+ *
+ * Outward: `App`、各 hooks、聊天与侧栏展示 context 用量。
+ */
+
 export function numberOrNull(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : null;

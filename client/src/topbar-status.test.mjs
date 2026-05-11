@@ -1,3 +1,10 @@
+/**
+ * 测试 panels/topbar-status.js：bridgeConnectionLabel 各连接与 runtime 组合。
+ * Keywords: topbar, bridge, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: panels/topbar-status.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bridgeConnectionLabel } from './panels/topbar-status.js';

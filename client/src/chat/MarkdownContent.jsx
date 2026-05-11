@@ -1,3 +1,17 @@
+/**
+ * Markdown 消息正文：GFM、安全链接、本地文件/图片、代码块与记忆引用展示。
+ *
+ * Keywords: react-markdown, message content, citation, image preview
+ *
+ * Exports:
+ * - MarkdownContent、MessageContent — 完整与拆分正文渲染。
+ * - contentWithAttachmentPreviews、splitMessageImages — 附件行与图文拆分。
+ *
+ * Inward: ../api、../app/session-utils、clipboard、memory-citation、ImagePreview。
+ *
+ * Outward: ChatMessage.jsx、PlanMessage、ActivityTimeline 等。
+ */
+
 import { BookOpen, Check, Copy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';

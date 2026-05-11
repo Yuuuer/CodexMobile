@@ -1,3 +1,17 @@
+/**
+ * 浏览器推送订阅注册与 Web Push 触发 API。
+ *
+ * Keywords: notification-routes, push-api, web-push
+ *
+ * Exports:
+ * - createNotificationRouteHandler — 需注入 pushService。
+ *
+ * Inward（本模块依赖/组装的关键符号）: http-utils、push-service。
+ *
+ * Outward（谁在用/调用场景）: server/index。
+ *
+ * 不负责: 业务启发式「何时推送」（由上层调用 pushService）。
+ */
 import { readBody, sendJson } from './http-utils.js';
 
 export function createNotificationRouteHandler({

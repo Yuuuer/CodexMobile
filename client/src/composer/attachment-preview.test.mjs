@@ -1,3 +1,13 @@
+/**
+ * 验证 attachment-preview：图片判断与本地预览 URL 拼接。
+ *
+ * Keywords: attachment-preview, local-image, tests
+ *
+ * Exports: 无导出 / 内含用例
+ *
+ * Inward: attachment-preview.js
+ */
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

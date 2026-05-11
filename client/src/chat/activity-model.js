@@ -1,3 +1,16 @@
+/**
+ * 会话中 activity/status 消息的解析、标签、去重合并与 upsert 逻辑。
+ *
+ * Keywords: activity message, status message, merge, codex payload
+ *
+ * Exports:
+ * - 无 default；含计划正文提取、活动步骤构建、消息流签名、upsertStatusMessage/upsertActivityMessage、mergeLoadedMessagesPreservingActivity 等大量会话层工具（详见模块内 export）。
+ *
+ * Inward: activity-display、activity-dedupe、activity-merge、../app/session-utils。
+ *
+ * Outward: App 状态与流式 payload 处理、Activity 相关组件。
+ */
+
 import { isThinkingActivityStep } from '../activity-display.js';
 import { removeDuplicateFinalAnswerActivity } from '../activity-dedupe.js';
 import { mergeActivityStep } from '../activity-merge.js';

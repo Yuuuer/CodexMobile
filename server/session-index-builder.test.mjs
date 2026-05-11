@@ -1,3 +1,12 @@
+/**
+ * 测试 server/session-index-builder.js：项目 id、索引构建与 projectless。
+ *
+ * Keywords: session-index, test, sqlite
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: session-index-builder.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

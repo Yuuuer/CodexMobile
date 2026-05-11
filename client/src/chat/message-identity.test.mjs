@@ -1,3 +1,13 @@
+/**
+ * 验证 message-identity：忽略图片 markdown、比对内容与旧版图片路径签名。
+ *
+ * Keywords: message-identity, tests, dedupe
+ *
+ * Exports: 无导出 / 内含用例
+ *
+ * Inward: message-identity.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

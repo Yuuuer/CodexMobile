@@ -1,3 +1,18 @@
+/**
+ * 组装聊天业务：队列、桌面桥接/后台 fallback、图片与自动标题等子能力。
+ *
+ * Keywords: chat-service, desktop-bridge, codex-turn, queue, attachments
+ *
+ * Exports:
+ * - createChatService — 创建可注入依赖的聊天服务实例。
+ * - normalizeSelectedSkills — 再导出自 chat-request-prep。
+ *
+ * Inward（本模块依赖/组装的关键符号）: chat-queue、chat-delivery、chat-request-prep、chat-image-handler、desktop-turn-monitor、runtime-debug。
+ *
+ * Outward（谁在用/调用场景）: HTTP 聊天路由或上层服务装配。
+ *
+ * 不负责: Codex CLI 进程细节（由 codex-runner 等承担）。
+ */
 import {
   registerProjectlessThread as registerProjectlessThreadInCodexState
 } from './codex-config.js';
@@ -17,6 +32,10 @@ import {
 import { createChatImageHandler } from './chat-image-handler.js';
 import { createChatAutoNamer } from './chat-auto-title.js';
 import { createDesktopTurnMonitor } from './desktop-turn-monitor.js';
+import {
+  compactActiveRuns,
+  runtimeDebugLine
+} from './runtime-debug.js';
 
 export { normalizeSelectedSkills } from './chat-request-prep.js';
 
@@ -252,6 +271,24 @@ export function createChatService({
       conversationSessionId &&
       sessionHasActiveWork(conversationSessionId);
 
+    runtimeDebugLine('sendChat.enter', {
+      remoteAddress,
+      sendMode,
+      imagePrompt: Boolean(imagePrompt),
+      bridgeMode: bridge?.mode,
+      bridgeConnected: bridge?.connected,
+      selectedSessionId,
+      draftSessionId,
+      conversationSessionId,
+      turnId,
+      queueKey,
+      shouldHoldInLocalQueue,
+      selectedSessionResolvedFromBackgroundAlias,
+      headlessRuns: compactActiveRuns(getActiveRuns()),
+      desktopTurnRuns: compactActiveRuns(desktopTurnMonitor.getActiveRuns()),
+      imageRuns: compactActiveRuns(chatImage.getActiveImageRuns())
+    });
+
     if (shouldHoldInLocalQueue) {
       const queued = enqueueChatJob({
         queueKey,
@@ -272,6 +309,7 @@ export function createChatService({
         permissionMode: body.permissionMode || 'bypassPermissions',
         collaborationMode
       }, { forceQueued: true, autoStart: false });
+      runtimeDebugLine('sendChat.exit', { branch: 'hold-local-queue', delivery: 'queued', turnId });
       return {
         accepted: true,
         queued,
@@ -284,8 +322,13 @@ export function createChatService({
     }
 
     if (bridge?.mode === 'desktop-ipc' && !imagePrompt) {
+      runtimeDebugLine('sendChat.branch', { branch: 'try-desktop-ipc', bridgeMode: bridge?.mode });
       if (!selectedSessionId && desktopIpcCanUseBackgroundFallback(bridge)) {
         bridge = backgroundFallbackBridge(bridge, '桌面端还不能从手机新建真实桌面线程，已改用后台 Codex 新建。');
+        runtimeDebugLine('sendChat.bridge', {
+          reason: 'no-session-background-fallback',
+          bridgeModeAfter: bridge?.mode
+        });
       } else {
         try {
           const result = await sendViaDesktopIpc({
@@ -324,6 +367,12 @@ export function createChatService({
             userMessage: visibleMessage,
             startedAt: new Date().toISOString()
           });
+          runtimeDebugLine('sendChat.exit', {
+            branch: 'desktop-ipc',
+            delivery: result?.delivery || 'desktop-ipc',
+            sessionId: result.sessionId,
+            turnId: result.turnId || turnId
+          });
           return result;
         } catch (error) {
           const canFallBackToBackground =
@@ -338,6 +387,11 @@ export function createChatService({
               ? undefined
               : '桌面端当前没有接管这个线程，已改用后台 Codex 继续执行。'
           );
+          runtimeDebugLine('sendChat.bridge', {
+            reason: 'desktop-ipc-error-fallback',
+            code: error?.code || null,
+            bridgeModeAfter: bridge?.mode
+          });
         }
       }
     }
@@ -348,6 +402,11 @@ export function createChatService({
         error.statusCode = 409;
         throw error;
       }
+      runtimeDebugLine('sendChat.branch', {
+        branch: 'steer-headless',
+        bridgeMode: bridge?.mode,
+        selectedSessionId
+      });
       const result = await steerCodexTurn(selectedSessionId, {
         message: codexMessage,
         attachments,
@@ -382,6 +441,12 @@ export function createChatService({
         label: '已发送到当前任务',
         detail: '',
         timestamp: new Date().toISOString()
+      });
+      runtimeDebugLine('sendChat.exit', {
+        branch: 'steer',
+        delivery: 'steered',
+        sessionId: result.sessionId || selectedSessionId,
+        turnId: result.turnId || turnId
       });
       return {
         accepted: true,
@@ -420,7 +485,8 @@ export function createChatService({
     });
 
     if (imagePrompt) {
-      return chatImage.startImageChat({
+      runtimeDebugLine('sendChat.branch', { branch: 'image-chat' });
+      const imageResult = await chatImage.startImageChat({
         project,
         selectedSessionId,
         conversationSessionId,
@@ -431,8 +497,21 @@ export function createChatService({
         config,
         bridge
       });
+      runtimeDebugLine('sendChat.exit', {
+        branch: 'image-chat',
+        delivery: imageResult?.delivery || 'image',
+        sessionId: imageResult?.sessionId ?? selectedSessionId ?? conversationSessionId,
+        turnId: imageResult?.turnId ?? turnId
+      });
+      return imageResult;
     }
 
+    runtimeDebugLine('sendChat.branch', {
+      branch: 'headless',
+      bridgeMode: bridge?.mode,
+      sendMode,
+      interrupt: sendMode === 'interrupt'
+    });
     console.log(`[chat] accepted codex turn=${turnId} session=${selectedSessionId || draftSessionId || ''} project=${project.name}`);
     if (sendMode === 'interrupt' && selectedSessionId) {
       abortCodexTurn(selectedSessionId);
@@ -460,13 +539,22 @@ export function createChatService({
       collaborationMode
     });
 
+    const delivery =
+      sendMode === 'interrupt' ? 'interrupted-started' : (queued ? 'queued' : 'started');
+    runtimeDebugLine('sendChat.exit', {
+      branch: 'headless',
+      delivery,
+      sessionId: selectedSessionId || draftSessionId || conversationSessionId,
+      turnId,
+      queued
+    });
     return {
       accepted: true,
       queued,
       sessionId: selectedSessionId,
       draftSessionId,
       turnId,
-      delivery: sendMode === 'interrupt' ? 'interrupted-started' : (queued ? 'queued' : 'started'),
+      delivery,
       desktopBridge: bridge
     };
   }
@@ -476,6 +564,14 @@ export function createChatService({
     const sessionId = String(body.sessionId || '').trim();
     const previousSessionId = String(body.previousSessionId || '').trim();
     console.log(`[chat] abort request remote=${remoteAddress} turn=${turnId} session=${sessionId}`);
+    runtimeDebugLine('abortChat.enter', {
+      remoteAddress,
+      turnId,
+      sessionId,
+      previousSessionId,
+      headlessRuns: compactActiveRuns(getActiveRuns()),
+      desktopTurnRuns: compactActiveRuns(desktopTurnMonitor.getActiveRuns())
+    });
     const localRun = activeLocalRunForAbort({ turnId, sessionId, previousSessionId });
     if (localRun) {
       const aborted = abortCodexTurn(localRun.turnId || turnId || sessionId);
@@ -500,6 +596,7 @@ export function createChatService({
         completedAt
       });
       broadcast(payload);
+      runtimeDebugLine('abortChat.exit', { branch: 'headless-local', aborted: Boolean(aborted || turnId || sessionId) });
       return Boolean(aborted || turnId || sessionId);
     }
     const desktopRun = desktopTurnMonitor.getRun(turnId) || desktopTurnMonitor.getRun(sessionId);
@@ -516,7 +613,9 @@ export function createChatService({
         wrapped.statusCode = error.statusCode || 502;
         throw wrapped;
       }
-      return desktopTurnMonitor.abortRun(turnId) || desktopTurnMonitor.abortRun(sessionId);
+      const ok = desktopTurnMonitor.abortRun(turnId) || desktopTurnMonitor.abortRun(sessionId);
+      runtimeDebugLine('abortChat.exit', { branch: 'desktop-monitor-interrupt', ok });
+      return ok;
     }
 
     const aborted = abortCodexTurn(turnId || sessionId);
@@ -551,10 +650,12 @@ export function createChatService({
           completedAt
         });
         broadcast(payload);
+        runtimeDebugLine('abortChat.exit', { branch: 'desktop-ipc-fallback', aborted: true });
         return true;
       }
     }
     if (!turnId && !aborted) {
+      runtimeDebugLine('abortChat.exit', { branch: 'noop', aborted: false });
       return false;
     }
 
@@ -577,6 +678,7 @@ export function createChatService({
       completedAt
     });
     broadcast(payload);
+    runtimeDebugLine('abortChat.exit', { branch: 'generic-broadcast', aborted: true });
     return true;
   }
 

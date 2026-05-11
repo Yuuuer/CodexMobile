@@ -1,3 +1,17 @@
+/**
+ * Git 工作区摘要的移动端安全提示、改动计数与动作拦阻原因。
+ *
+ * Keywords: git, safety, warnings, branch, mobile
+ *
+ * Exports:
+ * - MAX_MOBILE_GIT_FILES — 列表截断上限常量。
+ * - gitChangedFileCount / gitSafetyWarnings / gitActionBlockReason — 状态解读与拦阻。
+ *
+ * Inward: 无。
+ *
+ * Outward: GitPanel、提交前确认逻辑。
+ */
+
 export const MAX_MOBILE_GIT_FILES = 500;
 
 export function gitChangedFileCount(status = {}) {

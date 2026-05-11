@@ -1,3 +1,18 @@
+/**
+ * 桌面桥规范化、建线程能力与 Composer 发送按钮禁用态/文案推导。
+ *
+ * Keywords: desktop-bridge, composer, send-state, capabilities
+ *
+ * Exports:
+ * - normalizeDesktopBridge — 统一 bridge 形状。
+ * - desktopBridgeCanCreateThread — 是否允许发起新线程。
+ * - composerSendState — disabled、label、mode 等发送区状态。
+ *
+ * Inward: 无。
+ *
+ * Outward: Composer、提交流程与会话创建入口。
+ */
+
 export function normalizeDesktopBridge(bridge = null) {
   return {
     strict: bridge?.strict !== false,

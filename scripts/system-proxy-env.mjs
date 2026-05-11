@@ -1,3 +1,18 @@
+/**
+ * 在 macOS 上读取 scutil --proxy 并将系统 HTTP(S) 代理写入进程环境（尊重已有代理变量）。
+ *
+ * Keywords: macOS, scutil, proxy, HTTPS_PROXY, environment
+ *
+ * Exports:
+ * - hasExplicitProxyEnv — 环境是否已显式配置代理键。
+ * - proxyUrlFromScutilOutput — 解析 scutil 文本为 http://host:port。
+ * - applyMacSystemProxyEnv — 按需写入 HTTPS_PROXY 等并返回是否生效。
+ *
+ * Inward（本模块依赖/组装的关键符号）: node:child_process spawnSync（默认 /usr/sbin/scutil）。
+ *
+ * Outward（谁在用/调用场景）: scripts/run-server.mjs、start-server.mjs。
+ */
+
 import { spawnSync } from 'node:child_process';
 
 const PROXY_ENV_KEYS = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy'];

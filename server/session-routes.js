@@ -1,3 +1,17 @@
+/**
+ * 会话与消息 REST API：列表、重命名、删除、读消息、刷新缓存等。
+ *
+ * Keywords: session-routes, rest-api, codex-data
+ *
+ * Exports:
+ * - createSessionRouteHandler — 注入 codex-data 与 chatService 依赖。
+ *
+ * Inward（本模块依赖/组装的关键符号）: http-utils。
+ *
+ * Outward（谁在用/调用场景）: server/index。
+ *
+ * 不负责: ChatService 发包实现。
+ */
 import { readBody, sendJson } from './http-utils.js';
 
 export function createSessionRouteHandler({

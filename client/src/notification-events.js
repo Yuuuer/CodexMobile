@@ -1,3 +1,20 @@
+/**
+ * 浏览器通知偏好、PWA 判定、载荷是否需要用户介入及 Toast/通知正文映射。
+ *
+ * Keywords: notifications, preferences, PWA, payload, user-input
+ *
+ * Exports:
+ * - NOTIFICATION_PREF_KEY — localStorage 键。
+ * - browserNotificationPermission / browserNotificationsSupported — 能力探测。
+ * - notificationPreferenceEnabled / setNotificationPreferenceEnabled — 用户开关持久化。
+ * - isStandalonePwa / shouldUseWebNotification — 环境判断。
+ * - payloadNeedsUserInput / notificationFromPayload — 服务端事件到 UI 文案。
+ *
+ * Inward: 无外部模块。
+ *
+ * Outward: useNotifications、WebSocket 聊天完成/错误处理。
+ */
+
 export const NOTIFICATION_PREF_KEY = 'codexmobile.notificationsEnabled';
 
 const NEEDS_INPUT_PATTERN = /(需要.*(输入|确认|授权|允许|处理)|等待.*(用户|确认)|approval|permission|confirm|blocked|needs.*input|user.*input)/i;

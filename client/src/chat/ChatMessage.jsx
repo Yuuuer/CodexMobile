@@ -1,3 +1,16 @@
+/**
+ * 单条聊天消息壳层：用户/助手复制、活动气泡、计划消息与图片条分发。
+ *
+ * Keywords: ChatMessage, copy, plan, activity
+ *
+ * Exports:
+ * - ChatMessage — 按 role 路由到 ActivityMessage、PlanMessage 或标准气泡。
+ *
+ * Inward: session-utils、MarkdownContent、PlanMessage、ActivityMessage、ImagePreview。
+ *
+ * Outward: ChatPane.jsx
+ */
+
 import { Check, Copy, CornerDownRight, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { formatTime } from '../app/session-utils.js';

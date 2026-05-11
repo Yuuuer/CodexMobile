@@ -1,3 +1,19 @@
+/**
+ * 封装 lark-cli 子进程调用：鉴权状态、文档/多维表格等检查与 Feishu 技能上下文注入。
+ *
+ * Keywords: lark-cli, feishu, spawn, cli-wrapper
+ *
+ * Exports:
+ * - larkCliEnvironment — 为子进程准备环境变量。
+ * - getLarkDocsStatus / startLarkCliAuth / logoutLarkCli — 运维与登录流程。
+ * - buildCodexLarkCliContext — 将 Lark 能力与 Feishu skills 拼进 Codex 上下文。
+ *
+ * Inward（本模块依赖/组装的关键符号）: feishu-skills、child_process.spawn、仓库内 skills 目录。
+ *
+ * Outward（谁在用/调用场景）: feishu-routes、Codex 请求预处理。
+ *
+ * 不负责: 云端飞书 API 直连（走 lark-cli）。
+ */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';

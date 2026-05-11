@@ -1,4 +1,22 @@
+/**
+ * 选中会话的实时消息合并、桌面运行中活动载荷、轮询条件与项目名称同步。
+ *
+ * Keywords: session, live-refresh, polling, merge-messages, desktop-runtime
+ *
+ * Exports:
+ * - desktopRunningActivityPayload — 从消息列表提取运行中活动载荷。
+ * - syncDesktopActivityRuntimeFromMessages — 同步运行时快照。
+ * - shouldPollSelectedSessionMessages — 是否应对当前会话轮询消息。
+ * - mergeLiveSelectedThreadMessages — 合并本地与已加载消息。
+ * - applySessionRenameToProjectSessions — 重命名写回 projects map。
+ *
+ * Inward: chat/message-identity、app/runtime-debug-client。
+ *
+ * Outward: App 选中会话刷新、WebSocket 与轮询协调。
+ */
+
 import { sameUserMessageContent } from './chat/message-identity.js';
+import { clientRuntimeDebug } from './app/runtime-debug-client.js';
 
 function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -189,6 +207,7 @@ export function syncDesktopActivityRuntimeFromMessages({
   const payload = desktopRunningActivityPayload(messages, sessionId, selectedRunRuntime);
   if (payload) {
     markRun?.(payload);
+    clientRuntimeDebug('desktopActivityRuntimeSync', { sessionId, outcome: 'marked', source: payload.source });
     return 'marked';
   }
 
@@ -200,6 +219,11 @@ export function syncDesktopActivityRuntimeFromMessages({
       turnId: selectedRunRuntime.turnId || null
     });
     markSessionCompleteNotice?.(completedPayload);
+    clientRuntimeDebug('desktopActivityRuntimeSync', {
+      sessionId,
+      outcome: 'completed',
+      source: selectedRunRuntime?.source
+    });
     return 'completed';
   }
 
@@ -208,6 +232,11 @@ export function syncDesktopActivityRuntimeFromMessages({
       source: selectedRunRuntime.source || 'desktop-thread',
       sessionId,
       turnId: selectedRunRuntime.turnId || null
+    });
+    clientRuntimeDebug('desktopActivityRuntimeSync', {
+      sessionId,
+      outcome: 'cleared',
+      source: selectedRunRuntime?.source
     });
     return 'cleared';
   }

@@ -1,3 +1,10 @@
+/**
+ * 测试 app/selection-persistence.js：启动时项目 / 会话选中记忆。
+ * Keywords: persistence, selection, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: app/selection-persistence.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

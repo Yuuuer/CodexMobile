@@ -1,3 +1,19 @@
+/**
+ * 移动端本地会话状态：隐藏会话/删除消息等持久化到 state 目录。
+ *
+ * Keywords: session-local-state, hide-session, deleted-messages
+ *
+ * Exports:
+ * - filterDeletedMessages — 过滤已删 message id。
+ * - createSessionLocalState — 工厂。
+ * - hideSessionInMobile / hideSessionMessageInLocalState 等 — 默认实例便捷方法。
+ *
+ * Inward（本模块依赖/组装的关键符号）: Node fs/promises、.codexmobile/state 路径约定。
+ *
+ * Outward（谁在用/调用场景）: 会话与聊天流程在需要剔除本地可见消息时调用。
+ *
+ * 不负责: Codex 桌面端原始 rollout。
+ */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 

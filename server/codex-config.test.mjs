@@ -1,3 +1,12 @@
+/**
+ * 测试 server/codex-config.js：隔离 CODEX_HOME 下配置读取行为。
+ *
+ * Keywords: codex-config, test, toml
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: codex-config.js
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';

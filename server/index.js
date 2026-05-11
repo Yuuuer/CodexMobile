@@ -1,3 +1,17 @@
+/**
+ * CodexMobile 服务端主入口：装配 HTTP/HTTPS、WebSocket、路由与 Codex 缓存同步。
+ *
+ * Keywords: http-server, https, websocket, codex-cache, auth, routes
+ *
+ * Exports:
+ * - 无 default；副作用启动 main()。
+ *
+ * Inward（本模块依赖/组装的关键符号）: auth、codex-data、chat/file/git/session/voice 等 route handler、静态资源与推送。
+ *
+ * Outward（谁在用/调用场景）: Node 进程直接执行本文件作为服务端入口。
+ *
+ * 不负责: 各子模块内的具体业务实现。
+ */
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import https from 'node:https';
@@ -53,12 +67,19 @@ import { publicVoiceSpeechStatus } from './voice-speaker.js';
 import { publicVoiceRealtimeStatus, startVoiceRealtimeProxy } from './realtime-voice.js';
 import { maybeAutoNameSession } from './session-title-generator.js';
 import { createChatService } from './chat-service.js';
+import {
+  configureRuntimeDebug,
+  getRuntimeDebugPublicState,
+  runtimeDebugStatusActiveRuns,
+  setRuntimeDebugUiEnabled
+} from './runtime-debug.js';
 import { readBody, sendJson } from './http-utils.js';
 import { createPushService } from './push-service.js';
 import { createStaticService } from './static-service.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
+configureRuntimeDebug({ rootDir: ROOT_DIR });
 const CLIENT_DIST = path.join(ROOT_DIR, 'client', 'dist');
 const UPLOAD_ROOT = path.join(ROOT_DIR, '.codexmobile', 'uploads');
 const IMAGE_PROMPT_STATE = path.join(ROOT_DIR, '.codexmobile', 'state', 'image-prompts.json');
@@ -267,6 +288,12 @@ async function publicStatus(authenticated) {
   const snapshot = getCacheSnapshot();
   const config = snapshot.config || await getStatusConfigFallback() || {};
   const desktopBridge = await getDesktopBridgeStatus();
+  const activeRuns = [
+    ...getActiveRuns(),
+    ...chatService.getActiveDesktopIpcRuns(),
+    ...chatService.getActiveImageRuns()
+  ];
+  runtimeDebugStatusActiveRuns(activeRuns);
   return {
     connected: true,
     desktopBridge,
@@ -284,7 +311,8 @@ async function publicStatus(authenticated) {
     voiceRealtime: publicVoiceRealtimeStatus(config),
     docs: await feishuIntegration.publicDocsStatus(authenticated),
     syncedAt: snapshot.syncedAt,
-    activeRuns: [...getActiveRuns(), ...chatService.getActiveDesktopIpcRuns(), ...chatService.getActiveImageRuns()],
+    activeRuns,
+    runtimeDebug: getRuntimeDebugPublicState(),
     auth: {
       required: true,
       authenticated,
@@ -324,6 +352,13 @@ async function handleApi(req, res, url) {
   }
 
   if (!(await requireAuth(req, res, pathname, url))) {
+    return;
+  }
+
+  if (method === 'POST' && pathname === '/api/runtime-debug') {
+    const body = await readBody(req);
+    setRuntimeDebugUiEnabled(Boolean(body.enabled));
+    sendJson(res, 200, getRuntimeDebugPublicState());
     return;
   }
 

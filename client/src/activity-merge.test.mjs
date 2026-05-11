@@ -1,3 +1,10 @@
+/**
+ * 测试 activity-merge.js：活动步骤合并与思考步骤折叠。
+ * Keywords: activity, merge, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: activity-merge.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mergeActivityStep } from './activity-merge.js';

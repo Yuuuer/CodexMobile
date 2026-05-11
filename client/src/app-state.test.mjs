@@ -1,3 +1,10 @@
+/**
+ * 测试 app/AppState.js 与 session-utils 等：归约器、会话与运行时状态工具。
+ * Keywords: app-state, reducer, session-utils, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: app/AppState.js（及文件内其它 import）
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { appReducer, createInitialUiState } from './app/AppState.js';
@@ -126,6 +133,12 @@ test('empty activeRuns status keeps desktop thread running activity', () => {
     role: 'activity',
     kind: 'turn',
     status: 'running',
+    source: 'headless-local'
+  }), false);
+  assert.equal(shouldDropRunningActivityWhenNoActiveRuns({
+    role: 'activity',
+    kind: 'turn',
+    status: 'running',
     transient: true
   }), false);
   assert.equal(shouldClearRuntimeWhenNoActiveRuns({
@@ -135,11 +148,11 @@ test('empty activeRuns status keeps desktop thread running activity', () => {
   assert.equal(shouldClearRuntimeWhenNoActiveRuns({
     status: 'running',
     source: 'desktop-ipc'
-  }), true);
+  }), false);
   assert.equal(shouldClearRuntimeWhenNoActiveRuns({
     status: 'running',
     source: 'headless-local'
-  }), true);
+  }), false);
   assert.equal(shouldClearRuntimeWhenNoActiveRuns({
     status: 'running',
     source: 'codexmobile'
@@ -186,7 +199,7 @@ test('activeRuns status merge can preserve external desktop runtimes beside mobi
     'completed-thread': { status: 'completed', source: 'desktop-thread' }
   });
 
-  assert.deepEqual(Object.keys(preserved), ['desktop-thread-1']);
+  assert.deepEqual(Object.keys(preserved), ['desktop-thread-1', 'desktop-ipc-turn-1', 'headless-turn-1']);
   assert.equal(preserved['desktop-thread-1'], desktopRuntime);
 });
 

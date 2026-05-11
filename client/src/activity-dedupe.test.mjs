@@ -1,3 +1,10 @@
+/**
+ * 测试 activity-dedupe.js：最终答案与活动旁白去重。
+ * Keywords: activity, dedupe, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: activity-dedupe.js
+ */
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

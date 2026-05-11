@@ -1,3 +1,17 @@
+/**
+ * Composer 斜杠指令表及 token 检测、替换与按查询过滤。
+ *
+ * Keywords: composer, slash-commands, autocomplete, tokens
+ *
+ * Exports:
+ * - SLASH_COMMANDS — 内置指令与插入文案配置。
+ * - detectComposerToken / replaceComposerToken / filteredSlashCommands — 编辑器辅助。
+ *
+ * Inward: 无。
+ *
+ * Outward: 输入框、快捷指令菜单。
+ */
+
 export const SLASH_COMMANDS = [
   {
     id: 'plan',

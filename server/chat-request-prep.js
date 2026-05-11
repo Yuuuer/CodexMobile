@@ -1,3 +1,20 @@
+/**
+ * 将客户端请求体规整为 Codex 调用参数：技能列表、协作模式、项目外线程工作目录等。
+ *
+ * Keywords: chat-request, skills, collaboration-mode, projectless
+ *
+ * Exports:
+ * - projectlessThreadWorkingDirectory — 解析无项目线程的工作目录。
+ * - normalizeSelectedSkills — 规范化技能选择。
+ * - normalizeCollaborationMode — 规范化协作模式。
+ * - prepareChatRequest — 产出 send/request 载荷与元数据。
+ *
+ * Inward（本模块依赖/组装的关键符号）: codex-config、codex-data、upload-service、shared/service-tier。
+ *
+ * Outward（谁在用/调用场景）: chat-service、测试。
+ *
+ * 不负责: 实际跑 Codex 进程。
+ */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';

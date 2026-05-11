@@ -1,3 +1,10 @@
+/**
+ * 测试 activity-timeline.js：工具类时间线占位项过滤。
+ * Keywords: activity, timeline, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: activity-timeline.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { isPlaceholderTimelineItem } from './activity-timeline.js';

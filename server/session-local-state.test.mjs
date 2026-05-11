@@ -1,3 +1,12 @@
+/**
+ * 测试 server/session-local-state.js：隐藏会话与删除消息持久化。
+ *
+ * Keywords: session-local-state, test, state-dir
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: session-local-state.js
+ */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';

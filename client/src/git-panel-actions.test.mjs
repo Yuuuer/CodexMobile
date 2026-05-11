@@ -1,3 +1,10 @@
+/**
+ * 测试 git-panel-actions.js：面板动作到 API 路径与参数配置。
+ * Keywords: git, API-config, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: git-panel-actions.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { gitActionRequestConfig } from './git-panel-actions.js';

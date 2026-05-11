@@ -1,3 +1,19 @@
+/**
+ * 与 Codex 桌面端 Unix domain socket 的 IPC 帧协议客户端与便捷方法。
+ *
+ * Keywords: desktop-ipc, unix-socket, net-socket, follower-turn
+ *
+ * Exports:
+ * - desktopIpcMethodVersion / desktopIpcSocketPath / getDesktopIpcSocketStatus。
+ * - DesktopIpcClient — 连接与请求封装。
+ * - probeDesktopIpc / startDesktopFollowerTurn / steerDesktopFollowerTurn / interruptDesktopFollowerTurn 等。
+ *
+ * Inward（本模块依赖/组装的关键符号）: node:net、平台相关 socket 路径约定。
+ *
+ * Outward（谁在用/调用场景）: chat-delivery、codex-app-server、测试。
+ *
+ * 不负责: HTTP 层。
+ */
 import crypto from 'node:crypto';
 import fsSync from 'node:fs';
 import net from 'node:net';

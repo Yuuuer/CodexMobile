@@ -1,3 +1,17 @@
+/**
+ * 飞书 / 文档连接器侧栏面板及飞书品牌 SVG 图标。
+ *
+ * Keywords: feishu, docs, panel, connector, OAuth
+ *
+ * Exports:
+ * - FeishuLogoIcon — 飞书 Logo。
+ * - DocsPanel — 文档连接、授权与断开等 UI。
+ *
+ * Inward: lucide-react；状态与 API 由父组件通过 props 传入。
+ *
+ * Outward: Drawer / 顶层在「文档」入口打开时渲染。
+ */
+
 import { Check, ChevronLeft, Loader2, RefreshCw, ShieldCheck, X } from 'lucide-react';
 
 export function FeishuLogoIcon({ size = 30, className = '' }) {

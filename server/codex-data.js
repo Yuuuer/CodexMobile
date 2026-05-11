@@ -1,3 +1,20 @@
+/**
+ * Codex 侧项目/会话数据聚合缓存：同步索引、消息读取、隐藏与桌面 thread 联动。
+ *
+ * Keywords: codex-data, session-cache, sqlite, desktop-sync
+ *
+ * Exports:
+ * - 再导出 desktop/session 解析符号。
+ * - refreshCodexCache / getCacheSnapshot — 缓存生命周期。
+ * - listProjects / getProject / listProjectSessions / getSession / rememberLiveSession。
+ * - renameSession / deleteSession / hideSessionMessage / readSessionMessages / getHostName。
+ *
+ * Inward（本模块依赖/组装的关键符号）: session-index-builder、session-message-reader、mobile-session-index、codex-app-server、session-local-state。
+ *
+ * Outward（谁在用/调用场景）: server/index、各 API handler 注入。
+ *
+ * 不负责: HTTP 细节。
+ */
 import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';

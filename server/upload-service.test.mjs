@@ -1,3 +1,12 @@
+/**
+ * 测试 server/upload-service.js：multipart 解析与附件/Markdown 引用插入。
+ *
+ * Keywords: upload-service, multipart, attachments, test
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: upload-service.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

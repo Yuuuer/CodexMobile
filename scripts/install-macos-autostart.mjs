@@ -1,3 +1,16 @@
+/**
+ * 安装或卸载 macOS LaunchAgent，使 CodexMobile 在登录后由 run-server.mjs 拉起。
+ *
+ * Keywords: macOS, LaunchAgent, launchctl, autostart, plist
+ *
+ * Exports:
+ * - 无 default，CLI 自执行。
+ *
+ * Inward（本模块依赖/组装的关键符号）: launchctl、lsof；scripts/run-server.mjs。
+ *
+ * Outward（谁在用/调用场景）: package.json mac:autostart / mac:autostart:remove。
+ */
+
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

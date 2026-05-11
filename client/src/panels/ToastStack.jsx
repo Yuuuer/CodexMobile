@@ -1,3 +1,16 @@
+/**
+ * 应用内多条 Toast 的堆叠展示与单条关闭。
+ *
+ * Keywords: toast, notification, UI, dismiss
+ *
+ * Exports:
+ * - ToastStack — Toast 列表组件。
+ *
+ * Inward: lucide-react。
+ *
+ * Outward: 与 useNotifications 或全局提醒逻辑配合挂载。
+ */
+
 import { X } from 'lucide-react';
 
 export function ToastStack({ toasts, onDismiss }) {

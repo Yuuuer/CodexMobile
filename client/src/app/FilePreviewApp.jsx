@@ -1,3 +1,16 @@
+/**
+ * 独立文件预览入口：拉取工作区文件、按类型渲染 PDF/ Markdown/文本或下载fallback，并提供主题化工具栏与外链分享。
+ *
+ * Keywords: file-preview, pdf, markdown, workspace-file
+ *
+ * Exports:
+ * - default — `FilePreviewApp`（由 `main` 按需挂载的整页预览壳）。
+ *
+ * Inward: `api`；`MarkdownContent`、`PdfPreview`、`session-utils`（路径与本地文件 URL）、`pwa-theme`。
+ *
+ * Outward: `main.jsx` 单独路由或入口挂载。
+ */
+
 import { ArrowLeft, Check, Code2, Copy, ExternalLink, FileText, Minus, Plus, RefreshCw, Save, Share2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, getToken } from '../api.js';

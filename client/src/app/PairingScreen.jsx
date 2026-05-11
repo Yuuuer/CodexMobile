@@ -1,3 +1,16 @@
+/**
+ * 设备配对门禁：输入桌面端展示码，调用 `/api/pair` 换取 token 后通知上层进入主应用。
+ *
+ * Keywords: pairing, device-auth, token
+ *
+ * Exports:
+ * - default — `PairingScreen`（未认证时由 `App` 全屏展示）。
+ *
+ * Inward: `api`（`apiFetch`、`setToken`）。
+ *
+ * Outward: `App.jsx` 在 `authenticated === false` 时渲染。
+ */
+
 import { Check, Loader2, Monitor } from 'lucide-react';
 import { useState } from 'react';
 import { apiFetch, setToken } from '../api.js';

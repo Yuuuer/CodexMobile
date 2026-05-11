@@ -1,3 +1,20 @@
+/**
+ * HTTP 通用工具：JSON/HTML 响应、gzip 静态、请求体与安全路径解析。
+ *
+ * Keywords: http-utils, gzip, readBody, sendJson
+ *
+ * Exports:
+ * - DEFAULT_COMPRESSIBLE_EXTENSIONS — 可压缩静态扩展名集合。
+ * - sendJson / sendHtml / htmlEscape — 响应与转义。
+ * - acceptsGzip / staticCacheControl / sendStaticContent — 静态与缓存。
+ * - readBody / readBuffer — 读取请求体。
+ *
+ * Inward（本模块依赖/组装的关键符号）: node:zlib、node:path。
+ *
+ * Outward（谁在用/调用场景）: 几乎所有 server 路由模块。
+ *
+ * 不负责: 路由分发。
+ */
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 

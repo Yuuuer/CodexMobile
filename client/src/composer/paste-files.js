@@ -1,3 +1,16 @@
+/**
+ * 从 ClipboardData 抽取 File 列表并去重，供 Composer 粘贴上传。
+ *
+ * Keywords: clipboard, paste, file upload, dedupe
+ *
+ * Exports:
+ * - filesFromClipboardData — 合并 files 与 items 中的文件并按键去重。
+ *
+ * Inward: 浏览器 Clipboard API 数据结构。
+ *
+ * Outward: Composer.jsx
+ */
+
 function fileKey(file) {
   return [
     file?.name || '',

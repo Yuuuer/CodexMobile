@@ -1,3 +1,10 @@
+/**
+ * 测试 app/turn-submission-utils.js：发步元数据、会话选择与轮询条件等工具。
+ * Keywords: turn-submission, composer, tests
+ * Exports: 无导出 / 内含用例
+ * Inward: app/turn-submission-utils.js
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

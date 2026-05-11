@@ -1,3 +1,16 @@
+/**
+ * 管理会话队列草稿：拉取、删除、恢复与 steer，并同步输入/附件/技能状态。
+ *
+ * Keywords: queue drafts, chat queue, session, apiFetch
+ *
+ * Exports:
+ * - useQueueDrafts — 返回 queueDrafts 与 load/remove/restore/steer 方法。
+ *
+ * Inward: ../api.js、../app/session-utils.js（draft vs 正式 session）。
+ *
+ * Outward: App.jsx / 持有 Composer 状态的容器。
+ */
+
 import { useCallback, useState } from 'react';
 import { apiFetch } from '../api.js';
 import { isDraftSession } from '../app/session-utils.js';

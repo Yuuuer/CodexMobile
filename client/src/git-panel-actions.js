@@ -1,3 +1,16 @@
+/**
+ * Git 面板动作到后端 HTTP 路径、方法与 body 的映射（含较长超时）。
+ *
+ * Keywords: git, API, routes, commit, push, branch
+ *
+ * Exports:
+ * - gitActionRequestConfig — 给定 action 名返回 { path, options }。
+ *
+ * Inward: 无。
+ *
+ * Outward: GitPanel 与 git 相关请求封装。
+ */
+
 export function gitActionRequestConfig(action, {
   projectId,
   commitMessage = '',

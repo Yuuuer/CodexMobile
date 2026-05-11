@@ -1,3 +1,20 @@
+/**
+ * 与本机 Codex.app / headless codex 子进程通信，查询桌面桥状态与 thread 列表。
+ *
+ * Keywords: codex-app-server, child-process, desktop-bridge, thread-api
+ *
+ * Exports:
+ * - resolveAppServerTransport / defaultServerRequestResult — 传输层与默认响应。
+ * - CodexAppServerClient / createCodexAppServerClient — 客户端构造。
+ * - getDesktopBridgeStatus — 当前桥接健康与能力摘要。
+ * - listDesktopThreads / readDesktopThread / setDesktopThreadName / archiveDesktopThread — Thread CRUD 辅助。
+ *
+ * Inward（本模块依赖/组装的关键符号）: desktop-ipc-client（广播/probe）、child_process.spawn。
+ *
+ * Outward（谁在用/调用场景）: codex-data、chat-delivery、session 读取。
+ *
+ * 不负责: 移动端 HTTP 路由。
+ */
 import { spawn } from 'node:child_process';
 import fsSync from 'node:fs';
 import os from 'node:os';

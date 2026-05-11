@@ -1,3 +1,19 @@
+/**
+ * 多部分上传解析、附件规范化与 Markdown 中图片/文件引用插入。
+ *
+ * Keywords: multipart, upload, attachments, markdown
+ *
+ * Exports:
+ * - parseHeaderValue / sanitizeFileName / classifyUpload / parseMultipartFile — 解析与校验。
+ * - readVoiceUpload / saveUpload IO 封装。
+ * - normalizeAttachments / markdownImage* / with*References / normalizeFileMentions — 文本与附件合并。
+ *
+ * Inward（本模块依赖/组装的关键符号）: http-utils.readBuffer、node:fs。
+ *
+ * Outward（谁在用/调用场景）: voice-routes、file-routes、chat-request-prep。
+ *
+ * 不负责: 持久化会话消息。
+ */
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';

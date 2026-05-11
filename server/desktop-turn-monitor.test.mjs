@@ -1,3 +1,12 @@
+/**
+ * 测试 server/desktop-turn-monitor.js：桌面回合监听与计时器交互。
+ *
+ * Keywords: desktop-turn-monitor, test
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: desktop-turn-monitor.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDesktopTurnMonitor } from './desktop-turn-monitor.js';

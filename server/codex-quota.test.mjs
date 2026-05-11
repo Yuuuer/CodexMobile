@@ -1,3 +1,12 @@
+/**
+ * 测试 server/codex-quota.js：错误归类与 quotaTestHooks 辅助。
+ *
+ * Keywords: codex-quota, test, error-handling
+ *
+ * Exports: 无导出，内含用例
+ *
+ * Inward: codex-quota.js
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { quotaTestHooks } from './codex-quota.js';
