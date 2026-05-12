@@ -5,6 +5,7 @@ dist/
 coverage/
 .vite/
 .cache/
+.codex/
 playwright-report/
 test-results/
 
