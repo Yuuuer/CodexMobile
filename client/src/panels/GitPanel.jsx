@@ -15,7 +15,7 @@ import { Check, ChevronLeft, Copy, ExternalLink, FileText, FolderGit2, GitBranch
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../api.js';
 import { gitActionRequestConfig } from '../git-panel-actions.js';
-import { gitActionBlockReason, gitChangedFileCount, gitSafetyWarnings } from '../git-panel-state.js';
+import { gitActionBlockReason, gitChangedFileCount, gitFallbackBranches, gitSafetyWarnings } from '../git-panel-state.js';
 import { copyTextToClipboard } from '../utils/clipboard.js';
 
 function gitActionTitle(action) {
@@ -94,22 +94,14 @@ export function GitPanel({ open, action, project, onClose, onToast }) {
       if (loadError.status !== 404) {
         throw loadError;
       }
-      const nextStatus = status || (await loadStatus());
-      const currentBranch = nextStatus?.branch || '';
-      const fallbackBranches = {
-        current: currentBranch,
-        defaultBranch: 'main',
-        limited: true,
-        branches: currentBranch
-          ? [{ name: currentBranch, current: true, default: currentBranch === 'main', upstream: nextStatus?.upstream || null }]
-          : []
-      };
+      const nextStatus = await loadStatus();
+      const fallbackBranches = gitFallbackBranches(nextStatus);
       setBranches(fallbackBranches);
       setBaseBranch((current) => current || 'main');
       setBranchName((current) => current || gitBranchDraft(project));
       return fallbackBranches;
     }
-  }, [open, projectId, project, status, loadStatus]);
+  }, [open, projectId, project, loadStatus]);
 
   const loadDiff = useCallback(async () => {
     if (!open || !projectId) return;

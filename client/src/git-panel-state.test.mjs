@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { gitActionBlockReason, gitChangedFileCount, gitSafetyWarnings } from './git-panel-state.js';
+import { gitActionBlockReason, gitChangedFileCount, gitFallbackBranches, gitSafetyWarnings } from './git-panel-state.js';
 
 test('gitChangedFileCount prefers server total over displayed file slice', () => {
   assert.equal(gitChangedFileCount({ fileCount: 5388, files: [{ path: 'a' }] }), 5388);
@@ -50,4 +50,23 @@ test('gitActionBlockReason allows focused codex branch actions', () => {
 test('gitActionBlockReason still blocks missing branches and empty commits', () => {
   assert.equal(gitActionBlockReason({ canCommit: true }, 'push'), '当前不在有效 Git 分支上');
   assert.equal(gitActionBlockReason({ branch: 'main', canCommit: false }, 'commit'), '没有可提交的改动');
+});
+
+test('gitFallbackBranches preserves the current branch when branch APIs are unavailable', () => {
+  assert.deepEqual(gitFallbackBranches({
+    branch: 'codex/mobile-git',
+    upstream: 'origin/codex/mobile-git'
+  }), {
+    current: 'codex/mobile-git',
+    defaultBranch: 'main',
+    limited: true,
+    branches: [
+      {
+        name: 'codex/mobile-git',
+        current: true,
+        default: false,
+        upstream: 'origin/codex/mobile-git'
+      }
+    ]
+  });
 });

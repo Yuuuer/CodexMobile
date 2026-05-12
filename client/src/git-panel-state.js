@@ -51,3 +51,15 @@ export function gitActionBlockReason(status = {}, action = '') {
   }
   return '';
 }
+
+export function gitFallbackBranches(status = {}) {
+  const currentBranch = status?.branch || '';
+  return {
+    current: currentBranch,
+    defaultBranch: 'main',
+    limited: true,
+    branches: currentBranch
+      ? [{ name: currentBranch, current: true, default: currentBranch === 'main', upstream: status?.upstream || null }]
+      : []
+  };
+}
