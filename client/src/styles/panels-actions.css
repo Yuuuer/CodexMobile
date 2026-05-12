@@ -1,0 +1,209 @@
+.actions-panel-body {
+  gap: 14px;
+}
+
+.actions-panel-actions {
+  justify-content: flex-start;
+}
+
+.actions-summary-card .git-status-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.actions-summary-card .git-status-metrics span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions-setup-preview,
+.actions-command-preview {
+  max-height: 24svh;
+}
+
+.actions-list {
+  display: grid;
+  gap: 10px;
+}
+
+.actions-row {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(222, 223, 220, 0.86);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.actions-row.is-disabled {
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.actions-row-head {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.actions-row-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.actions-row-title,
+.actions-row-tags {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.actions-row-title strong,
+.actions-row-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions-row-title strong {
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.actions-row-title span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.actions-row-tags {
+  justify-items: end;
+}
+
+.actions-row-tags span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(148, 163, 184, 0.14);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.actions-inline-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #8a5b24;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.actions-form-grid,
+.actions-confirm-grid,
+.actions-result-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.actions-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.actions-confirm-grid div,
+.actions-result-grid div {
+  display: grid;
+  gap: 4px;
+}
+
+.actions-confirm-grid small,
+.actions-result-grid strong {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.actions-confirm-grid strong,
+.actions-result-grid strong {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.actions-danger-card .git-help-text {
+  color: var(--danger);
+}
+
+.actions-output-error {
+  color: var(--danger);
+}
+
+.git-field select,
+.git-field textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(202, 205, 209, 0.9);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+
+.git-field select {
+  appearance: none;
+}
+
+.git-field textarea {
+  min-height: 132px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  resize: vertical;
+}
+
+.git-action-grid .is-secondary {
+  color: var(--text);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.git-action-grid .is-danger {
+  color: var(--danger);
+  background: rgba(194, 65, 58, 0.08);
+}
+
+[data-theme="dark"] .actions-row {
+  border-color: #202024;
+  background: #000000;
+}
+
+[data-theme="dark"] .actions-row.is-disabled {
+  border-color: rgba(245, 158, 11, 0.24);
+}
+
+[data-theme="dark"] .actions-row-tags span,
+[data-theme="dark"] .git-action-grid .is-secondary {
+  background: rgba(148, 163, 184, 0.16);
+}
+
+[data-theme="dark"] .git-action-grid .is-danger,
+[data-theme="dark"] .actions-output-error {
+  color: #fca5a5;
+}
+
+@media (max-width: 380px) {
+  .actions-row-head,
+  .actions-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-row-icon {
+    display: none;
+  }
+
+  .actions-row-tags {
+    justify-items: start;
+  }
+}

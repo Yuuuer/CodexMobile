@@ -13,7 +13,7 @@
  * Outward: App 根布局顶部固定区域。
  */
 
-import { Bell, Check, Copy, GitBranch, GitCommitHorizontal, MonitorUp, MoreHorizontal, Plus, UploadCloud } from 'lucide-react';
+import { Bell, Check, Copy, GitBranch, GitCommitHorizontal, MonitorUp, MoreHorizontal, Play, Plus, UploadCloud } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { copyTextToClipboard } from '../utils/clipboard.js';
 import { isDraftSession } from '../app/session-utils.js';
@@ -39,6 +39,7 @@ export function TopBar({
   selectedRuntime,
   onMenu,
   onOpenDocs,
+  onOpenActions,
   onGitAction,
   onDesktopHandoff,
   desktopHandoffSupported = true,
@@ -48,7 +49,8 @@ export function TopBar({
   onEnableNotifications,
   gitDisabled = false,
   homeMode = false,
-  initialGitMenuOpen = false
+  initialGitMenuOpen = false,
+  actionsDisabled = false
 }) {
   const status = bridgeConnectionLabel(connectionState, desktopBridge, { selectedSession, selectedRuntime });
   const [menuOpen, setMenuOpen] = useState(false);
@@ -97,6 +99,11 @@ export function TopBar({
   function handleToggleGitMenu() {
     setMenuOpen(false);
     setGitMenuOpen((value) => !value);
+  }
+
+  function handleOpenActions() {
+    setMenuOpen(false);
+    onOpenActions?.();
   }
 
   async function handleCopyThreadId() {
@@ -207,6 +214,15 @@ export function TopBar({
               <button type="button" role="menuitem" onClick={handleEnableNotifications}>
                 <Bell size={16} />
                 <span>{notificationEnabled ? '完成通知已开启' : '开启完成通知'}</span>
+              </button>
+              <div className="top-menu-divider" />
+              <div className="top-menu-title">
+                <Play size={16} />
+                <span>Actions</span>
+              </div>
+              <button type="button" role="menuitem" onClick={handleOpenActions} disabled={actionsDisabled}>
+                <Play size={16} />
+                <span>打开 Actions</span>
               </button>
             </div>
           ) : null}

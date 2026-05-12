@@ -10,6 +10,7 @@
  * Outward: App 与其它包路径 `panels` 的导入入口。
  */
 
+export { ActionsPanel } from './ActionsPanel.jsx';
 export { ConnectionRecoveryCard } from './ConnectionRecoveryCard.jsx';
 export { DocsPanel, FeishuLogoIcon } from './DocsPanel.jsx';
 export { Drawer } from './Drawer.jsx';

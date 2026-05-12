@@ -77,6 +77,8 @@ import { getDesktopBridgeStatus } from './codex-app-server.js';
 import { createChatRouteHandler } from './chat-routes.js';
 import { createFeishuIntegration } from './feishu-routes.js';
 import { createFileRouteHandler } from './file-routes.js';
+import { createActionsRouteHandler } from './actions-routes.js';
+import { createActionsService } from './actions-service.js';
 import { createGitRouteHandler } from './git-routes.js';
 import { createGitService } from './git-service.js';
 import { createNotificationRouteHandler } from './notification-routes.js';
@@ -148,6 +150,7 @@ const staticService = createStaticService({
 });
 const gitService = createGitService({ getProject });
 const updateService = createUpdateService({ rootDir: ROOT_DIR });
+const actionsService = createActionsService({ getProject });
 const pushService = createPushService({
   statePath: PUSH_STATE,
   subject: PUSH_SUBJECT
@@ -614,6 +617,7 @@ const handleSessionApi = createSessionRouteHandler({
 });
 const handleGitApi = createGitRouteHandler({ gitService });
 const handleUpdateApi = createUpdateRouteHandler({ updateService });
+const handleActionsApi = createActionsRouteHandler({ actionsService });
 const handleFileApi = createFileRouteHandler({
   getProject,
   staticService,
@@ -968,6 +972,10 @@ async function handleApi(req, res, url) {
   }
 
   if (await handleUpdateApi(req, res, url)) {
+    return;
+  }
+
+  if (await handleActionsApi(req, res, url)) {
     return;
   }
 

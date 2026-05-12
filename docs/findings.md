@@ -5,3 +5,21 @@
 2026-05-12 16:53:48:657 :环境结论：当前仓库位于 `main -> origin/main`，`git user.name/user.email` 已配置，且 `git fetch --dry-run origin` 与 `git push --dry-run origin HEAD` 均成功；因此 pull/push 无法在面板中完成，不是 remote、SSH 凭据或用户身份缺失导致。
 2026-05-12 17:21:23:157 :修复结论：只要切断 `loadBranches -> status` 这条闭包依赖，`refreshAll` 就不会因 `setStatus()` 被重建，GitPanel 初始化 effect 也不会再次自触发；这已经覆盖请求风暴的最短根因链。
 2026-05-12 17:21:23:158 :验证结论：与本次改动直接相关的客户端测试和构建均通过；`server/git-service.test.mjs` 里既有的 worktree 用例仍失败，但该失败发生在未修改的服务端文件，和本次客户端修复无直接因果关系。
+2026-05-12 18:58:51:376 :结构结论：现有 Git 功能已经形成可复用接入骨架，即“TopBar 菜单入口 -> App UI state -> 独立 Panel 组件 -> 独立 route handler -> 独立 service -> `getProject(projectId)` 约束工作目录”；“环境”模块可以沿这条骨架并列接入，无需侵入聊天主链。
+2026-05-12 18:58:51:376 :风险结论：如果把“环境操作”直接设计成任意命令透传，风险高于 Git 模块很多，主要是命令注入、工作目录越权、长时进程失控、stdout 过大、敏感环境变量泄露，以及移动端误触发破坏性命令；因此必须先引入“命令模板注册 + 参数白名单 + cwd 限定 + 超时/输出上限 + 前台只允许显式批准动作”的硬约束，不能照搬 Git 的自由执行方式。
+2026-05-12 19:11:47:880 :前置风险：用户指定的桌面端持久化文件 `.codex\\environmentsenvironment.toml` 在当前仓库下不存在；若这是路径拼写差异，则需求文档必须明确以真实落盘位置为准，避免后续实现兼容到错误文件。
+2026-05-12 19:13:55:185 :兼容结论：当前仓库存在桌面端环境定义文件 `.codex\\environments\\environment.toml`，其中动作以 `[[actions]]` 数组落盘，字段至少包含 `name`、`icon`、`command`，可选 `platform`；因此移动端模块应以“读取/展示/执行/新增/编辑/删除 actions”为真实目标，而不是自建另一套存储格式。
+2026-05-12 19:14:13:516 :实现结论：仓库当前没有 TOML 依赖，若要稳定兼容桌面端文件，最稳路径是引入轻量 TOML 读写能力；如果拒绝新增依赖，则只能支持当前已知字段的保守读写，未来桌面端文件结构变更时兼容风险更高。
+2026-05-12 19:19:07:007 :交付结论：本次需求文档已经统一改名为 `Actions` 模块，并固定采用“移动端模块名是 Actions，底层兼容桌面端 `.codex\\environments\\environment.toml` 中的 `[[actions]]`”这一方案；这条路径是当前最短且与桌面端最一致的实现方式。
+2026-05-12 19:56:08:907 :实现边界：本次只做前端切片，不碰后端正在并行开发的文件；因此接口层必须采用宽容读取、严格提示的策略，优先兼容 `GET/POST/PATCH/DELETE /api/actions` 的最小字段集，避免前端对未定字段形成硬依赖。
+2026-05-12 19:56:18:840 :当前实现基线：`package.json` 还没有 TOML 依赖，若服务端直接承担 TOML 读写与 revision 语义，最短稳路径是在后端新增轻量 TOML 解析/序列化能力，并把执行串行锁约束收敛在 `actions-service`，避免路由层分散状态。
+2026-05-12 20:13:37:169 :前端实现结论：`Actions` 面板已按 Git 面板骨架独立挂入 `TopBar -> App UI state -> AppShell -> ActionsPanel`，并与 Git 面板物理隔离；打开面板只依赖 `selectedProject`，不再错误复用 Git 的运行态禁用条件。
+2026-05-12 20:13:37:169 :兼容结论：前端目前只硬依赖 `projectId`、`revision`、`actionKey`、`environment.actions[]`、`exists`、`path` 等最小字段；若后端把执行结果包在 `result`、`run` 或 `execution` 下，当前归一化层都可兼容读取。
+2026-05-12 20:16:41:943 :验证结论：本次新增前端纯函数与壳层接线已通过定向单测和生产构建；由于按要求禁用 Browser 插件，页面级交互与样式回归尚未自动验收，需要人工手动验证。
+2026-05-12 20:18:21:814 :样式结论：`Actions` 面板在视觉上复用 `Git` 卡片体系，但按钮变体样式依赖于 CSS 导入顺序；已将 `panels-actions.css` 放到 `panels-git.css` 之后，避免删除/取消按钮被基类样式回退。
+2026-05-12 20:21:17:817 :后端接口结论：本次后端固定提供 `GET /api/actions?projectId=...`、`POST /api/actions/run`、`POST /api/actions`、`PATCH /api/actions`、`DELETE /api/actions`；读取与增改删统一返回 `{ success, exists, path, revision, environment }`，其中 `environment.actions[]` 固定包含 `actionKey`、`index`、`name`、`icon`、`command`、`platform`、`platformMatched`。
+2026-05-12 20:21:17:817 :后端实现结论：`actions-service` 已收敛非法 TOML 显式报错、项目 `cwd` 固定边界、`platform` 运行限制、基于文件内容的 `revision` 冲突检测，以及单项目单 action 并发锁；新增/编辑/删除会保留 `version`、`name`、`[setup].script`，并在缺文件时自动创建 `.codex\\environments\\environment.toml`。
+2026-05-12 20:21:17:817 :后端遗留风险：由于本次不能新增依赖，当前 TOML 解析器是按桌面端现有结构做的保守实现，已覆盖当前项目样例与多行字符串，但若未来桌面端在同一文件中引入更宽泛的 TOML 语法（如复杂数组、内联表、日期类型），这里需要继续扩展；另外 Windows 下长命令若自行再拉起子进程树，超时终止仍可能受宿主 shell 行为影响，需要后续真实环境手验。
+2026-05-12 20:24:48:381 :实现结论：后端已直接兼容项目内 `.codex\\environments\\environment.toml` 的 `[[actions]]`，支持读取、执行、新增、编辑、删除、revision 冲突校验、平台限制和单项目运行锁；前端已完成与该接口形状的对齐。
+2026-05-12 20:24:48:381 :剩余风险：本轮没有使用 Browser 插件做页面级自动验收，因此真实移动端交互、滚动、按钮态和多行命令展示仍需要人工手动验证；若发现问题，应优先校正面板交互而不是改动 TOML 协议。
+2026-05-12 20:55:28:051 :审查基线：本次仅做代码审查不改业务实现；由于按仓库要求禁用 Browser 插件，所有交互结论仅基于源码、测试与未提交差异，页面级表现仍需人工手动验证。

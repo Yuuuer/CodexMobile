@@ -27,6 +27,7 @@ export function createInitialUiState({ storage = globalThis.localStorage } = {})
     docsOpen: false,
     docsBusy: false,
     docsError: '',
+    actionsPanel: { open: false },
     gitPanel: { open: false, action: 'commit' },
     toasts: [],
     theme: normalizeThemePreference(storage?.getItem?.(THEME_KEY))
@@ -49,6 +50,8 @@ export function appReducer(state, action) {
       return { ...state, docsBusy: resolveValue(action.value, state.docsBusy) };
     case 'ui/docsError':
       return { ...state, docsError: resolveValue(action.value, state.docsError) };
+    case 'ui/actionsPanel':
+      return { ...state, actionsPanel: resolveValue(action.value, state.actionsPanel) };
     case 'ui/gitPanel':
       return { ...state, gitPanel: resolveValue(action.value, state.gitPanel) };
     case 'ui/toasts':

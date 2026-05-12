@@ -41,6 +41,12 @@ test('appReducer updates ui state with direct and functional values', () => {
     value: (current) => ({ ...current, open: true, action: 'sync' })
   });
   assert.deepEqual(nextGit.gitPanel, { open: true, action: 'sync' });
+
+  const nextActions = appReducer(nextGit, {
+    type: 'ui/actionsPanel',
+    value: { open: true }
+  });
+  assert.deepEqual(nextActions.actionsPanel, { open: true });
 });
 
 test('createInitialUiState restores dark theme from storage', () => {

@@ -93,9 +93,10 @@ export default function App() {
   const setDocsOpen = useCallback((value) => dispatchUi({ type: 'ui/docsOpen', value }), []);
   const setDocsBusy = useCallback((value) => dispatchUi({ type: 'ui/docsBusy', value }), []);
   const setDocsError = useCallback((value) => dispatchUi({ type: 'ui/docsError', value }), []);
+  const setActionsPanel = useCallback((value) => dispatchUi({ type: 'ui/actionsPanel', value }), []);
   const setGitPanel = useCallback((value) => dispatchUi({ type: 'ui/gitPanel', value }), []);
   const setTheme = useCallback((value) => dispatchUi({ type: 'ui/theme', value }), []);
-  const { drawerOpen, previewImage, docsOpen, docsBusy, docsError, gitPanel, theme } = uiState;
+  const { drawerOpen, previewImage, docsOpen, docsBusy, docsError, actionsPanel, gitPanel, theme } = uiState;
   const {
     toasts,
     notificationSupported,
@@ -670,6 +671,7 @@ export default function App() {
     if (!selectedProject || selectedRunning) {
       return;
     }
+    setActionsPanel({ open: false });
     const projectId = selectedProject.id;
     try {
       if (action === 'branch') {
@@ -740,6 +742,14 @@ export default function App() {
       const title = action === 'branch' ? '创建分支' : action === 'push' ? '推送' : '提交';
       showToast({ level: 'error', title, body: error.message || 'Git 操作失败。' });
     }
+  }
+
+  function handleOpenActions() {
+    if (!selectedProject) {
+      return;
+    }
+    setGitPanel((current) => ({ ...current, open: false }));
+    setActionsPanel({ open: true });
   }
 
   const {
@@ -968,6 +978,7 @@ export default function App() {
       selectedRuntime: topBarRuntime,
       onMenu: handleToggleDrawer,
       onOpenDocs: () => setDocsOpen(true),
+      onOpenActions: handleOpenActions,
       onGitAction: handleGitAction,
       onDesktopHandoff: handleDesktopHandoff,
       desktopHandoffSupported: status.desktopRefresh?.supported !== false,
@@ -976,7 +987,8 @@ export default function App() {
       notificationEnabled,
       onEnableNotifications: enableNotifications,
       gitDisabled: !selectedProject || selectedRunning,
-      homeMode: homePaneVisible
+      homeMode: homePaneVisible,
+      actionsDisabled: !selectedProject
     },
     docsPanelProps: {
       open: docsOpen,
@@ -989,6 +1001,12 @@ export default function App() {
       onOpenHome: handleOpenDocsHome,
       onOpenAuth: handleOpenDocsAuth,
       onRefresh: handleRefreshDocs
+    },
+    actionsPanelProps: {
+      open: actionsPanel.open,
+      project: selectedProject,
+      onToast: showToast,
+      onClose: () => setActionsPanel((current) => ({ ...current, open: false }))
     },
     gitPanelProps: {
       open: gitPanel.open,
