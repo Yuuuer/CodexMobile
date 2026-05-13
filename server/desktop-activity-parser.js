@@ -207,7 +207,14 @@ function isVisibleRawUserSegmentMessage(message) {
   if (!text) {
     return false;
   }
-  return !/^<environment_context\b/i.test(text.trim());
+  const trimmed = text.trim();
+  if (/^<environment_context\b/i.test(trimmed)) {
+    return false;
+  }
+  if (/^#\s*AGENTS\.md instructions\b/i.test(trimmed)) {
+    return false;
+  }
+  return true;
 }
 
 function segmentIndexForRawActivity(markers, item) {

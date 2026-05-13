@@ -32,7 +32,16 @@ export function ActivityMessage({ message, now = Date.now(), forceRunning = fals
   const [open, setOpen] = useState(() => initialActivityCardOpenState({ running, hasProcess, forceOpen }));
   const startedAt = message.startedAt || timeRange.startedAt || message.timestamp;
   const endedAt = running ? now : message.completedAt || timeRange.endedAt || message.timestamp || now;
-  const duration = !running ? formatDurationMs(message.durationMs) || formatDuration(startedAt, endedAt) : formatDuration(startedAt, endedAt);
+  const rangeDurationMs = new Date(endedAt || now).getTime() - new Date(startedAt || endedAt || now).getTime();
+  const safeRangeDurationMs = Number.isFinite(rangeDurationMs) && rangeDurationMs > 0 ? rangeDurationMs : 0;
+  const explicitDurationMs = Number(message.durationMs);
+  const completedDurationMs = Math.max(
+    Number.isFinite(explicitDurationMs) && explicitDurationMs > 0 ? explicitDurationMs : 0,
+    safeRangeDurationMs
+  );
+  const duration = !running
+    ? formatDurationMs(completedDurationMs) || formatDuration(startedAt, endedAt)
+    : formatDuration(startedAt, endedAt);
   const headline = failed ? '处理失败' : running ? '处理中' : '已处理';
 
   useEffect(() => {

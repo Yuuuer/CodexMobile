@@ -76,6 +76,43 @@ test('mergeLiveSelectedThreadMessages dedupes activity cards by client turn id a
   assert.deepEqual(merged.map((message) => message.id), ['activity-real-turn']);
 });
 
+test('mergeLiveSelectedThreadMessages coalesces loaded and live activity cards for one running session', () => {
+  const current = [
+    { id: 'u1', role: 'user', content: 'run', sessionId: 'thread-1', timestamp: '2026-05-14T03:40:00.000Z' },
+    {
+      id: 'activity-live',
+      role: 'activity',
+      status: 'running',
+      sessionId: 'thread-1',
+      turnId: 'headless-turn-1',
+      timestamp: '2026-05-14T03:40:20.000Z',
+      activities: [{ id: 'cmd-2', kind: 'command_execution', status: 'running', label: '正在运行命令' }]
+    }
+  ];
+  const loaded = [
+    { id: 'u1', role: 'user', content: 'run', sessionId: 'thread-1', timestamp: '2026-05-14T03:40:00.000Z' },
+    {
+      id: 'activity-loaded',
+      role: 'activity',
+      status: 'completed',
+      sessionId: 'thread-1',
+      turnId: 'desktop-turn-1',
+      timestamp: '2026-05-14T03:40:01.000Z',
+      activities: [{ id: 'commentary-1', kind: 'agent_message', status: 'completed', label: '先查目录。' }]
+    }
+  ];
+
+  const merged = mergeLiveSelectedThreadMessages(current, loaded);
+  const activities = merged.filter((message) => message.role === 'activity');
+  assert.equal(activities.length, 1);
+  assert.equal(activities[0].status, 'running');
+  assert.equal(activities[0].turnId, 'headless-turn-1');
+  assert.deepEqual(
+    activities[0].activities.map((activity) => activity.id),
+    ['commentary-1', 'cmd-2']
+  );
+});
+
 test('mergeLiveSelectedThreadMessages can drop stale desktop running activity after final reply arrives', () => {
   const current = [
     { id: 'u-local', role: 'user', content: 'run', sessionId: 'thread-1', timestamp: '2026-05-13T00:00:00.000Z' },

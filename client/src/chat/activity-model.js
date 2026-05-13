@@ -86,6 +86,149 @@ function findActivityMessageIndex(current = [], payload = {}, proposedId = '') {
   );
 }
 
+function timeMs(value) {
+  const time = value ? new Date(value).getTime() : NaN;
+  return Number.isFinite(time) ? time : null;
+}
+
+function earliestIso(...values) {
+  return values
+    .filter(Boolean)
+    .reduce((earliest, value) => {
+      const valueMs = timeMs(value);
+      const earliestMs = timeMs(earliest);
+      if (valueMs === null) {
+        return earliest;
+      }
+      return earliestMs === null || valueMs < earliestMs ? value : earliest;
+    }, null);
+}
+
+function latestIso(...values) {
+  return values
+    .filter(Boolean)
+    .reduce((latest, value) => {
+      const valueMs = timeMs(value);
+      const latestMs = timeMs(latest);
+      if (valueMs === null) {
+        return latest;
+      }
+      return latestMs === null || valueMs > latestMs ? value : latest;
+    }, null);
+}
+
+function positiveDurationMs(value) {
+  const duration = Number(value);
+  return Number.isFinite(duration) && duration > 0 ? duration : null;
+}
+
+function durationMsBetween(startedAt, completedAt) {
+  const startMs = timeMs(startedAt);
+  const endMs = timeMs(completedAt);
+  return startMs !== null && endMs !== null && endMs > startMs ? endMs - startMs : null;
+}
+
+function activityMessageSessionKeys(message = {}) {
+  return [message.sessionId, message.previousSessionId].map(cleanIdentity).filter(Boolean);
+}
+
+function activityMessagesShareSession(left = {}, right = {}) {
+  const rightKeys = new Set(activityMessageSessionKeys(right));
+  return activityMessageSessionKeys(left).some((key) => rightKeys.has(key));
+}
+
+function activityMessageIsActive(message = {}) {
+  return ['running', 'queued'].includes(String(message?.status || ''));
+}
+
+function activityMessagesShareRun(left = {}, right = {}) {
+  const rightKeys = new Set(activityMessageRunKeys(right));
+  return activityMessageRunKeys(left).some((key) => rightKeys.has(key));
+}
+
+function shouldCoalesceActivityMessages(left = {}, right = {}) {
+  if (left?.role !== 'activity' || right?.role !== 'activity') {
+    return false;
+  }
+  if (!sameActivitySegment(left, right)) {
+    return false;
+  }
+  if (activityMessagesShareRun(left, right)) {
+    return true;
+  }
+  return activityMessagesShareSession(left, right) && (activityMessageIsActive(left) || activityMessageIsActive(right));
+}
+
+function mergedActivityStatus(left = {}, right = {}) {
+  const statuses = [left.status, right.status].map((status) => String(status || ''));
+  if (statuses.includes('failed')) {
+    return 'failed';
+  }
+  if (statuses.some((status) => status === 'running' || status === 'queued')) {
+    return 'running';
+  }
+  if (statuses.includes('completed')) {
+    return 'completed';
+  }
+  return right.status || left.status || 'running';
+}
+
+function mergeActivityLists(left = [], right = []) {
+  return [...left, ...right].reduce((items, activity) => mergeActivityStep(items, activity), []);
+}
+
+function mergeActivityMessages(left = {}, right = {}) {
+  const status = mergedActivityStatus(left, right);
+  const primary = activityMessageIsActive(right)
+    ? right
+    : activityMessageIsActive(left)
+      ? left
+      : right;
+  const startedAt = earliestIso(left.startedAt, right.startedAt, left.timestamp, right.timestamp);
+  const completedAt = status === 'running'
+    ? null
+    : latestIso(left.completedAt, right.completedAt);
+  const explicitDuration = Math.max(
+    positiveDurationMs(left.durationMs) || 0,
+    positiveDurationMs(right.durationMs) || 0
+  ) || null;
+  const rangeDuration = status === 'running' ? null : durationMsBetween(startedAt, completedAt);
+  return {
+    ...left,
+    ...right,
+    id: left.id || right.id,
+    role: 'activity',
+    turnId: primary.turnId || right.turnId || left.turnId || null,
+    clientTurnId: primary.clientTurnId || right.clientTurnId || left.clientTurnId || null,
+    sessionId: primary.sessionId || right.sessionId || left.sessionId || null,
+    previousSessionId: primary.previousSessionId || right.previousSessionId || left.previousSessionId || null,
+    segmentIndex: left.segmentIndex ?? right.segmentIndex ?? 0,
+    source: right.source || left.source || null,
+    transient: Boolean(left.transient && right.transient),
+    content: status === 'completed' ? '过程已同步' : right.content || left.content || '正在处理',
+    label: status === 'completed' ? '过程已同步' : right.label || left.label || '正在处理',
+    status,
+    timestamp: earliestIso(left.timestamp, right.timestamp) || left.timestamp || right.timestamp || new Date().toISOString(),
+    startedAt,
+    completedAt,
+    durationMs: status === 'running' ? null : Math.max(explicitDuration || 0, rangeDuration || 0) || null,
+    activities: mergeActivityLists(left.activities || [], right.activities || [])
+  };
+}
+
+export function coalesceActivityMessages(messages = []) {
+  const result = [];
+  for (const message of messages) {
+    const previous = result[result.length - 1];
+    if (shouldCoalesceActivityMessages(previous, message)) {
+      result[result.length - 1] = mergeActivityMessages(previous, message);
+    } else {
+      result.push(message);
+    }
+  }
+  return result;
+}
+
 export function extractProposedPlanContent(message) {
   const value = String(message || '').trim();
   if (!value) {
@@ -710,7 +853,7 @@ export function completeActivityMessagesForTurn(current, payload) {
   }
   const finalText = normalizeActivityDuplicateText(payload.content || payload.label || '');
   const completedAt = payload.completedAt || payload.timestamp || new Date().toISOString();
-  return current.map((message) => {
+  return coalesceActivityMessages(current.map((message) => {
     if (message.role !== 'activity' || !payloadRunKeys(message).some((key) => keys.has(key))) {
       return message;
     }
@@ -740,11 +883,15 @@ export function completeActivityMessagesForTurn(current, payload) {
       label: message.status === 'failed' ? message.label : '过程已同步',
       content: message.status === 'failed' ? message.content : '过程已同步',
       startedAt: message.startedAt || payload.startedAt || message.timestamp || null,
-      completedAt: message.completedAt || completedAt,
-      durationMs: message.durationMs || payload.durationMs || null,
+      completedAt: latestIso(message.completedAt, completedAt) || completedAt,
+      durationMs:
+        positiveDurationMs(payload.durationMs) ||
+        positiveDurationMs(message.durationMs) ||
+        durationMsBetween(message.startedAt || payload.startedAt || message.timestamp || null, latestIso(message.completedAt, completedAt) || completedAt) ||
+        null,
       activities: completedActivities
     };
-  });
+  }));
 }
 
 export function normalizeActivityDuplicateText(value) {
@@ -763,7 +910,12 @@ export function mergeLoadedMessagesPreservingActivity(current, loaded, payload) 
   if (!keys.size || !Array.isArray(loaded)) {
     return loaded || [];
   }
-  if (loaded.some((message) => message.role === 'activity' && message.durationMs)) {
+  const payloadDuration = positiveDurationMs(payload.durationMs);
+  if (loaded.some((message) =>
+    message.role === 'activity' &&
+    positiveDurationMs(message.durationMs) &&
+    (!payloadDuration || positiveDurationMs(message.durationMs) >= payloadDuration)
+  )) {
     return loaded;
   }
   const activityMessages = completeActivityMessagesForTurn(
@@ -846,17 +998,17 @@ export function upsertStatusMessage(current, payload) {
     status: isTurnLevel ? (normalizedPayload.status || previous?.status || 'running') : (previous?.status || 'running'),
     timestamp: normalizedPayload.timestamp || previous?.timestamp || new Date().toISOString(),
     startedAt: previous?.startedAt || normalizedPayload.startedAt || normalizedPayload.timestamp || new Date().toISOString(),
-    completedAt: previous?.completedAt || terminalTimestamp || null,
-    durationMs: previous?.durationMs || normalizedPayload.durationMs || null,
+    completedAt: terminalTimestamp ? latestIso(previous?.completedAt, terminalTimestamp) : previous?.completedAt || null,
+    durationMs: positiveDurationMs(normalizedPayload.durationMs) || positiveDurationMs(previous?.durationMs) || null,
     activities: mergeActivityStep(previous?.activities || [], activity)
   };
 
   if (existingIndex >= 0) {
     const next = [...current];
     next[existingIndex] = nextMessage;
-    return next;
+    return coalesceActivityMessages(next);
   }
-  return [...current, nextMessage];
+  return coalesceActivityMessages([...current, nextMessage]);
 }
 
 function hasConcreteActivityPayload(payload = {}) {
@@ -916,6 +1068,7 @@ export function upsertActivityMessage(current, payload) {
   const payloadStatus = String(payload.status || '').trim();
   const payloadIsTerminal = ['completed', 'failed'].includes(payloadStatus);
   const hasRunningActivity = activities.some((item) => item?.status === 'running' || item?.status === 'queued');
+  const hasSpecificTurnKey = Boolean(payload.turnId || payload.clientTurnId || previous?.turnId || previous?.clientTurnId);
   const messageStatus = isTurnLevel
     ? (payload.status || previous?.status || 'running')
     : hasRunningActivity
@@ -942,19 +1095,20 @@ export function upsertActivityMessage(current, payload) {
     timestamp: previous?.timestamp || payload.timestamp || new Date().toISOString(),
     startedAt: previous?.startedAt || payload.startedAt || previous?.timestamp || payload.timestamp || new Date().toISOString(),
     completedAt:
-      previous?.completedAt ||
       payload.completedAt ||
-      ((isTurnLevel || payloadIsTerminal) && ['completed', 'failed'].includes(messageStatus) ? payload.timestamp || new Date().toISOString() : null),
-    durationMs: previous?.durationMs || payload.durationMs || null,
+      (['completed', 'failed'].includes(messageStatus) && (isTurnLevel || !hasSpecificTurnKey)
+        ? payload.timestamp || previous?.completedAt || new Date().toISOString()
+        : previous?.completedAt || null),
+    durationMs: positiveDurationMs(payload.durationMs) || positiveDurationMs(previous?.durationMs) || null,
     activities
   };
 
   if (existingIndex >= 0) {
     const next = [...current];
     next[existingIndex] = nextMessage;
-    return next;
+    return coalesceActivityMessages(next);
   }
-  return [...current, nextMessage];
+  return coalesceActivityMessages([...current, nextMessage]);
 }
 
 export function completeStatusMessage(current, payload) {

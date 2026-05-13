@@ -140,6 +140,34 @@ test('upsertActivityMessage completes standalone context compaction cards', () =
   assert.equal(result[0].activities[0].status, 'completed');
 });
 
+test('upsertActivityMessage does not lock turn card completion time from an intermediate tool', () => {
+  const current = upsertActivityMessage([], {
+    sessionId: 'thread-1',
+    turnId: 'turn-1',
+    messageId: 'commentary-1',
+    kind: 'agent_message',
+    phase: 'commentary',
+    status: 'running',
+    label: '任务开始',
+    timestamp: '2026-05-14T03:32:56.000Z'
+  });
+
+  const afterTool = upsertActivityMessage(current, {
+    sessionId: 'thread-1',
+    turnId: 'turn-1',
+    messageId: 'cmd-1',
+    kind: 'command_execution',
+    status: 'completed',
+    label: '命令已完成',
+    command: 'sleep 1',
+    timestamp: '2026-05-14T03:32:58.000Z'
+  });
+
+  assert.equal(afterTool.length, 1);
+  assert.equal(afterTool[0].completedAt, null);
+  assert.equal(afterTool[0].durationMs, null);
+});
+
 test('completeActivityMessagesForTurn marks running activity steps completed', () => {
   const result = completeActivityMessagesForTurn([
     {
@@ -161,6 +189,78 @@ test('completeActivityMessagesForTurn marks running activity steps completed', (
 
   assert.equal(result[0].status, 'completed');
   assert.deepEqual(result[0].activities.map((activity) => activity.status), ['completed', 'completed']);
+});
+
+test('completeActivityMessagesForTurn uses full turn timing over stale short activity timing', () => {
+  const result = completeActivityMessagesForTurn([
+    {
+      id: 'status-turn-1',
+      role: 'activity',
+      status: 'completed',
+      sessionId: 'thread-1',
+      turnId: 'turn-1',
+      timestamp: '2026-05-14T03:32:56.000Z',
+      startedAt: '2026-05-14T03:32:56.000Z',
+      completedAt: '2026-05-14T03:32:58.000Z',
+      durationMs: 2000,
+      activities: [
+        { id: 'cmd-1', kind: 'command_execution', status: 'completed', label: '命令已完成' }
+      ]
+    }
+  ], {
+    sessionId: 'thread-1',
+    turnId: 'turn-1',
+    completedAt: '2026-05-14T03:34:13.000Z',
+    durationMs: 77000
+  });
+
+  assert.equal(result[0].completedAt, '2026-05-14T03:34:13.000Z');
+  assert.equal(result[0].durationMs, 77000);
+});
+
+test('upsertActivityMessage coalesces adjacent loaded and live cards for the same running session', () => {
+  const current = [
+    {
+      id: 'u1',
+      role: 'user',
+      content: '跑一个任务',
+      sessionId: 'thread-1',
+      timestamp: '2026-05-14T03:40:00.000Z'
+    },
+    {
+      id: 'activity-loaded',
+      role: 'activity',
+      status: 'completed',
+      sessionId: 'thread-1',
+      turnId: 'desktop-turn-1',
+      timestamp: '2026-05-14T03:40:01.000Z',
+      startedAt: '2026-05-14T03:40:01.000Z',
+      completedAt: '2026-05-14T03:40:02.000Z',
+      activities: [
+        { id: 'commentary-1', kind: 'agent_message', status: 'completed', label: '先查目录。' }
+      ]
+    }
+  ];
+
+  const result = upsertActivityMessage(current, {
+    sessionId: 'thread-1',
+    turnId: 'headless-turn-1',
+    messageId: 'cmd-2',
+    kind: 'command_execution',
+    status: 'running',
+    label: '正在处理本地任务',
+    command: 'sleep 45',
+    timestamp: '2026-05-14T03:40:20.000Z'
+  });
+
+  const activities = result.filter((message) => message.role === 'activity');
+  assert.equal(activities.length, 1);
+  assert.equal(activities[0].status, 'running');
+  assert.equal(activities[0].turnId, 'headless-turn-1');
+  assert.deepEqual(
+    activities[0].activities.map((activity) => activity.id),
+    ['commentary-1', 'cmd-2']
+  );
 });
 
 test('completeActivityMessagesForTurn keeps pending plan implementation actionable', () => {

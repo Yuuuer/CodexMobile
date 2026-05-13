@@ -7,12 +7,13 @@
  * - mergeLiveSelectedThreadMessages — 合并本地与已加载消息。
  * - applySessionRenameToProjectSessions — 重命名写回 projects map。
  *
- * Inward: chat/message-identity。
+ * Inward: chat/message-identity、chat/activity-model。
  *
  * Outward: App 选中会话刷新、WebSocket 与轮询协调。
  */
 
 import { sameUserMessageContent } from './chat/message-identity.js';
+import { coalesceActivityMessages } from './chat/activity-model.js';
 
 function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -140,14 +141,14 @@ function preserveLocalActivityMessages(current = [], loaded = [], { forceDropSta
     );
 
   if (!preserved.length) {
-    return loaded;
+    return coalesceActivityMessages(loaded);
   }
 
   const result = [...loaded];
   for (const activity of preserved.sort((a, b) => activityInsertIndex(result, a) - activityInsertIndex(result, b))) {
     result.splice(activityInsertIndex(result, activity), 0, activity);
   }
-  return result;
+  return coalesceActivityMessages(result);
 }
 
 export function mergeLiveSelectedThreadMessages(current = [], loaded = [], options = {}) {
@@ -155,7 +156,7 @@ export function mergeLiveSelectedThreadMessages(current = [], loaded = [], optio
     return Array.isArray(current) ? current : [];
   }
   if (!Array.isArray(current) || !current.length) {
-    return loaded;
+    return coalesceActivityMessages(loaded);
   }
 
   const loadedUsers = loaded.filter((message) => message?.role === 'user');

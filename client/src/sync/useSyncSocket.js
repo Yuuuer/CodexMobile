@@ -112,6 +112,87 @@ function confirmOrAppendUserMessage(current, event) {
   return existingConfirmed ? current : removeStalePlanRequestsAfterUserMessages([...current, incoming]);
 }
 
+function isCommentaryAssistantMessage(event = {}) {
+  const phase = String(event.message?.phase || event.phase || '').trim().toLowerCase();
+  return phase === 'commentary';
+}
+
+function normalizedInlineText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function removeAssistantMessageCoveredByProcessText(current, descriptor = {}) {
+  const ids = new Set([
+    descriptor.messageId,
+    descriptor.itemId,
+    descriptor.id
+  ].filter(Boolean).map(String));
+  const content = normalizedInlineText(descriptor.content);
+  const turnId = descriptor.turnId ? String(descriptor.turnId) : '';
+  const sessionId = descriptor.sessionId ? String(descriptor.sessionId) : '';
+  if (!ids.size && !content) {
+    return current;
+  }
+  return current.filter((message) => {
+    if (message.role !== 'assistant') {
+      return true;
+    }
+    if (ids.has(String(message.id || ''))) {
+      return false;
+    }
+    if (!content || normalizedInlineText(message.content) !== content) {
+      return true;
+    }
+    const sameTurn = turnId && message.turnId && String(message.turnId) === turnId;
+    const sameSession = sessionId && message.sessionId && String(message.sessionId) === sessionId;
+    return !(sameTurn || sameSession);
+  });
+}
+
+function commentaryDescriptorFromAssistantEvent(event = {}) {
+  return {
+    id: event.message?.id || event.messageId || event.id || null,
+    messageId: event.message?.id || event.messageId || event.id || null,
+    itemId: event.message?.id || event.messageId || event.id || null,
+    turnId: event.message?.turnId || event.turnId || event.clientTurnId || null,
+    sessionId: event.message?.sessionId || event.sessionId || null,
+    content: event.message?.content || ''
+  };
+}
+
+function commentaryDescriptorFromActivityEvent(event = {}) {
+  const activity = event.activity || {};
+  return {
+    id: activity.id || activity.messageId || event.id || null,
+    messageId: activity.messageId || activity.id || event.id || null,
+    itemId: activity.itemId || activity.messageId || activity.id || event.id || null,
+    turnId: activity.turnId || event.turnId || event.clientTurnId || null,
+    sessionId: activity.sessionId || event.sessionId || null,
+    content: activity.content || activity.label || activity.detail || ''
+  };
+}
+
+function isCommentaryActivity(event = {}) {
+  const activity = event.activity || {};
+  const phase = String(activity.phase || event.phase || '').trim().toLowerCase();
+  return (activity.kind === 'agent_message' || activity.kind === 'message') && phase === 'commentary';
+}
+
+function commentaryActivityPayload(event = {}, legacyPayload = {}) {
+  const content = String(event.message?.content || '').trim();
+  return {
+    ...legacyPayload,
+    messageId: event.message?.id || event.messageId || event.id || null,
+    itemId: event.message?.id || event.messageId || event.id || null,
+    kind: 'agent_message',
+    phase: 'commentary',
+    status: 'running',
+    label: content,
+    content,
+    timestamp: event.message?.timestamp || event.timestamp || legacyPayload.timestamp
+  };
+}
+
 export function applySyncSocketPayload(payload, context) {
   if (payload?.type === 'sync-state') {
     applyRuntimeStateFromSnapshot(payload.state, context);
@@ -214,18 +295,30 @@ export function applySyncSocketPayload(payload, context) {
 
   if (event.eventType?.startsWith('message.assistant') && event.message && syncEventMatchesCurrent(event, context.selectedSessionRef)) {
     if (String(event.message.content || '').trim()) {
-      context.setMessages((current) => upsertAssistantMessage(current, {
-        ...legacyPayload,
-        ...event.message,
-        content: event.message.content,
-        done: event.message.done
-      }));
+      if (isCommentaryAssistantMessage(event)) {
+        context.setMessages((current) => upsertActivityMessage(
+          removeAssistantMessageCoveredByProcessText(current, commentaryDescriptorFromAssistantEvent(event)),
+          commentaryActivityPayload(event, legacyPayload)
+        ));
+      } else {
+        context.setMessages((current) => upsertAssistantMessage(current, {
+          ...legacyPayload,
+          ...event.message,
+          content: event.message.content,
+          done: event.message.done
+        }));
+      }
     }
     return true;
   }
 
   if (event.eventType?.startsWith('activity.') && event.activity && !event.suppressedInChat && syncEventMatchesCurrent(event, context.selectedSessionRef)) {
-    context.setMessages((current) => upsertActivityMessage(current, event.activity));
+    context.setMessages((current) => upsertActivityMessage(
+      isCommentaryActivity(event)
+        ? removeAssistantMessageCoveredByProcessText(current, commentaryDescriptorFromActivityEvent(event))
+        : current,
+      event.activity
+    ));
     return true;
   }
 

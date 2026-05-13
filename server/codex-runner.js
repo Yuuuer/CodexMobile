@@ -4,7 +4,7 @@
  * Keywords: codex-runner, subprocess, streaming, abort, steer
  *
  * Exports:
- * - statusLabel / shouldCompleteTurnFromAppServerItem — 状态与回合完成判定辅助。
+ * - statusLabel / shouldCompleteTurnFromAppServerItem / appServerAgentMessagePhase — 状态与消息阶段判定辅助。
  * - runCodexTurn — 主演示路径：跑一轮 Codex。
  * - abortCodexTurn / getActiveRuns / steerCodexTurn — 控制运行中回合。
  *
@@ -544,6 +544,36 @@ function emitNativeImageResult(emit, { sessionId, turnId, messageId, item, statu
   return true;
 }
 
+export function appServerAgentMessagePhase(params = {}, state = {}, messageId = '') {
+  const directPhase = String(params.phase || params.item?.phase || '').trim().toLowerCase();
+  if (directPhase) {
+    return directPhase;
+  }
+  const itemId = messageId || params.itemId || params.item?.id || '';
+  const knownItem = itemId && state.items?.get ? state.items.get(itemId) : null;
+  return String(knownItem?.phase || '').trim().toLowerCase();
+}
+
+function emitAgentMessageActivity(emit, { sessionId, turnId, messageId, content, status = 'running' }) {
+  const text = String(content || '').trim();
+  if (!text) {
+    return;
+  }
+  emit({
+    type: 'activity-update',
+    sessionId,
+    turnId,
+    messageId,
+    itemId: messageId,
+    kind: 'agent_message',
+    phase: 'commentary',
+    label: text,
+    content: text,
+    status,
+    timestamp: new Date().toISOString()
+  });
+}
+
 function tokenUsagePayload(tokenUsage = {}) {
   const last = tokenUsage.last || {};
   const total = tokenUsage.total || {};
@@ -588,6 +618,16 @@ function emitAppServerItem({ method, params }, sessionId, turnId, emit, state) {
       return;
     }
     const isCommentary = rawItem.phase === 'commentary';
+    if (isCommentary) {
+      emitAgentMessageActivity(emit, {
+        sessionId,
+        turnId,
+        messageId,
+        content,
+        status
+      });
+      return;
+    }
     emit({
       type: 'assistant-update',
       sessionId,
@@ -686,8 +726,18 @@ function emitAppServerNotification(message, sessionId, turnId, emit, state) {
     const content = `${previous}${params.delta || ''}`;
     state.agentMessages.set(messageId, content);
     if (content.trim()) {
+      const phase = appServerAgentMessagePhase(params, state, messageId);
+      if (phase === 'commentary') {
+        emitAgentMessageActivity(emit, {
+          sessionId,
+          turnId,
+          messageId,
+          content,
+          status: 'running'
+        });
+        return;
+      }
       state.hadAssistantText = true;
-      emitStatus(emit, { sessionId, turnId, kind: 'agent_message', status: 'running', label: '正在回复' });
       emit({
         type: 'assistant-update',
         sessionId,

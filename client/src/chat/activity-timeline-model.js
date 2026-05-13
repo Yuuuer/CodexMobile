@@ -19,12 +19,14 @@ export function activityTimeRange(steps) {
   let endedAt = null;
 
   for (const step of steps || []) {
-    const timestamp = step.timestamp || '';
-    if (timestamp && (!startedAt || new Date(timestamp) < new Date(startedAt))) {
-      startedAt = timestamp;
-    }
-    if (timestamp && (!endedAt || new Date(timestamp) > new Date(endedAt))) {
-      endedAt = timestamp;
+    const timestamps = [step.startedAt, step.timestamp, step.completedAt].filter(Boolean);
+    for (const timestamp of timestamps) {
+      if (timestamp && (!startedAt || new Date(timestamp) < new Date(startedAt))) {
+        startedAt = timestamp;
+      }
+      if (timestamp && (!endedAt || new Date(timestamp) > new Date(endedAt))) {
+        endedAt = timestamp;
+      }
     }
   }
 

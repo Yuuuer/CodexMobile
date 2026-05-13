@@ -1146,6 +1146,71 @@ test('rawSessionActivitiesFromJsonl ignores hidden environment user rows when as
   );
 });
 
+test('rawSessionActivitiesFromJsonl ignores AGENTS instruction rows when assigning guided segments', () => {
+  const turnWindow = [
+    {
+      id: 'turn-1',
+      startedAt: Date.parse('2026-02-02T00:00:00.000Z') / 1000,
+      completedAt: Date.parse('2026-02-02T00:00:10.000Z') / 1000
+    }
+  ];
+  const content = [
+    {
+      timestamp: '2026-02-02T00:00:00.000Z',
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: '# AGENTS.md instructions for /repo\n\n<INSTRUCTIONS>\n...\n</INSTRUCTIONS>' }]
+      }
+    },
+    {
+      timestamp: '2026-02-02T00:00:00.010Z',
+      type: 'turn_context',
+      payload: { turn_id: 'turn-1' }
+    },
+    {
+      timestamp: '2026-02-02T00:00:00.100Z',
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: '跑一个长任务' }]
+      }
+    },
+    {
+      timestamp: '2026-02-02T00:00:01.000Z',
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        role: 'assistant',
+        phase: 'commentary',
+        content: [{ type: 'output_text', text: '先启动命令。' }]
+      }
+    },
+    {
+      timestamp: '2026-02-02T00:00:02.000Z',
+      type: 'response_item',
+      payload: {
+        type: 'function_call',
+        name: 'exec_command',
+        call_id: 'call-1',
+        arguments: JSON.stringify({ cmd: 'sleep 5' })
+      }
+    }
+  ].map((entry) => JSON.stringify(entry)).join('\n');
+
+  const activities = rawSessionActivitiesFromJsonl(content, turnWindow);
+
+  assert.deepEqual(
+    activities.map((item) => [item.activity.kind, item.segmentIndex ?? 0]),
+    [
+      ['agent_message', 0],
+      ['command_execution', 0]
+    ]
+  );
+});
+
 test('rawSessionActivitiesFromJsonl keeps context compaction at its JSONL position', () => {
   const turnWindow = [
     {
