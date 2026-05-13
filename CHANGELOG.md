@@ -4,6 +4,26 @@ All notable changes to CodexMobile are tracked here.
 
 ## Unreleased
 
+## [1.3.0] - 2026-05-13
+
+### Added
+
+- Added WebSocket-backed sync plumbing for mobile/desktop refresh events, including shared sync reducers, server-side sync storage, and desktop cache invalidation broadcasts.
+- Added runtime debug helpers for inspecting active run state and bridge behavior from the mobile app.
+- Added inline add/delete highlighting for file-diff activity summaries in chat.
+
+### Changed
+
+- Refactored the mobile app into clearer app, chat, composer, panel, and sync flows while preserving the existing local Node bridge shape.
+- Improved desktop IPC and background app-server routing so existing desktop threads, background-created mobile threads, and session refreshes stay better aligned.
+- Polished activity rendering, top-bar status, drawer behavior, and composer styling after the 1.2 release.
+- Updated the package version to `1.3.0`.
+
+### Fixed
+
+- Removed noisy placeholder thinking activity from the visible chat stream.
+- Fixed several stale runtime and live-polling cases that could leave mobile UI state behind the desktop thread state.
+
 ## [1.2.0] - 2026-05-09
 
 ### Added
