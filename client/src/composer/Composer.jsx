@@ -15,7 +15,7 @@
 import { ArrowUp, Bot, Check, ChevronDown, ClipboardList, FileText, Image, Loader2, MessageSquare, MessageSquarePlus, Paperclip, Plus, Search, Shield, Square, Terminal, Trash2, X, Zap } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, getToken } from '../api.js';
-import { detectComposerToken, filteredSlashCommands, replaceComposerToken } from '../composer-shortcuts.js';
+import { detectComposerToken, exactSlashCommandForInput, filteredSlashCommands, replaceComposerToken } from '../composer-shortcuts.js';
 import { composerSendState } from '../send-state.js';
 import { isDraftSession } from '../app/session-utils.js';
 import { attachmentPreviewUrl, isImageAttachment } from './attachment-preview.js';
@@ -63,7 +63,8 @@ export function Composer({
   queueDrafts,
   onRestoreQueueDraft,
   onRemoveQueueDraft,
-  onSteerQueueDraft
+  onSteerQueueDraft,
+  onCompactContext
 }) {
   const textareaRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -180,6 +181,12 @@ export function Composer({
   }
 
   function runSlashCommand(command) {
+    if (command.action === 'compact-context') {
+      replaceCurrentToken('');
+      setOpenMenu(null);
+      onCompactContext?.();
+      return;
+    }
     replaceCurrentToken(command.prompt ? `${command.prompt} ` : '');
     if (command.action === 'open-context') {
       setOpenMenu('context');
@@ -209,6 +216,13 @@ export function Composer({
     event.preventDefault();
     if (stopMode) {
       onAbort();
+      return;
+    }
+    const exactCommand = exactSlashCommandForInput(input);
+    if (exactCommand?.action === 'compact-context') {
+      setInput('');
+      setOpenMenu(null);
+      onCompactContext?.();
       return;
     }
     if (runningInputMode) {

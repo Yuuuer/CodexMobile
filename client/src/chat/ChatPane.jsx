@@ -6,7 +6,7 @@
  * Exports:
  * - ChatPane — 包裹 ChatMessage 列表与底部对齐逻辑。
  *
- * Inward: ../chat-scroll.js、session-utils、ChatMessage.jsx、chat-render-items。
+ * Inward: ../chat-scroll.js、ChatMessage.jsx、chat-render-items、activity-model。
  *
  * Outward: App.jsx
  */
@@ -14,9 +14,9 @@
 import { AlertCircle, ArrowDown, Loader2, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { isNearChatBottom, shouldFollowChatOutput } from '../chat-scroll.js';
-import { payloadRunKeys, selectedRunKeys } from '../app/session-utils.js';
 import { ActivityFileSummary } from './ActivityFileSummary.jsx';
 import { ChatMessage } from './ChatMessage.jsx';
+import { latestActivityMessageIdForRuntime } from './activity-model.js';
 import { chatRenderItems } from './chat-render-items.js';
 
 export function ChatPane({
@@ -26,6 +26,7 @@ export function ChatPane({
   loadError = '',
   running,
   activeRunKeys = [],
+  activeRuntimeStartedAt = null,
   now,
   onPreviewImage,
   onDeleteMessage,
@@ -40,7 +41,12 @@ export function ChatPane({
   const hasMessages = messages.length > 0;
   const sessionId = selectedSession?.id || '';
   const pinnedBeforeRender = bottomPinnedRef.current;
-  const activeActivityMessageId = running ? latestSelectedActivityMessageId(messages, selectedSession, activeRunKeys) : '';
+  const activeActivityMessageId = latestActivityMessageIdForRuntime(messages, {
+    running,
+    activeRunKeys,
+    runtimeStartedAt: activeRuntimeStartedAt
+  });
+  const forceOpenActivityMessageId = activeActivityMessageId;
   const renderItems = chatRenderItems(messages, { activeActivityMessageId });
 
   const scrollToBottom = useCallback((behavior = 'auto') => {
@@ -164,6 +170,7 @@ export function ChatPane({
               message={item.message}
               now={now}
               activeActivityMessageId={activeActivityMessageId}
+              forceOpenActivityMessageId={forceOpenActivityMessageId}
               afterContent={item.fileSummaries?.map((summary, index) => (
                 <ActivityFileSummary key={`${item.key}-file-summary-${index}`} summary={summary} />
               ))}
@@ -191,21 +198,4 @@ export function ChatPane({
       ) : null}
     </section>
   );
-}
-
-function latestSelectedActivityMessageId(messages = [], selectedSession = null, activeRunKeys = []) {
-  const selectedKeys = new Set(activeRunKeys.length ? activeRunKeys : selectedRunKeys(selectedSession));
-  if (!selectedKeys.size) {
-    return '';
-  }
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message?.role !== 'activity') {
-      continue;
-    }
-    if (payloadRunKeys(message).some((key) => selectedKeys.has(key))) {
-      return message.id || '';
-    }
-  }
-  return '';
 }

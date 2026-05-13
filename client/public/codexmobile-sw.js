@@ -1,9 +1,28 @@
+/**
+ * CodexMobile PWA service worker：系统通知点击处理与前端更新接管。
+ *
+ * Keywords: service-worker, pwa, notifications, update
+ *
+ * Exports:
+ * - 无导出；由浏览器以 service worker 脚本加载。
+ *
+ * Inward: Service Worker runtime、Push API、Clients API。
+ *
+ * Outward: web-push-client、pwa-update 注册 `/codexmobile-sw.js`。
+ */
+
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    event.waitUntil(self.skipWaiting());
+  }
 });
 
 self.addEventListener('push', (event) => {

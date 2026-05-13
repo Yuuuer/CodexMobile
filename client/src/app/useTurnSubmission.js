@@ -145,7 +145,21 @@ export function useTurnSubmission({
       sessionId: optimisticSessionId,
       turnId
     };
-    setMessages((current) => removeStalePlanRequestsAfterUserMessages([...current, localUserMessage]));
+    setMessages((current) =>
+      upsertStatusMessage(removeStalePlanRequestsAfterUserMessages([...current, localUserMessage]), {
+        source: 'local-optimistic',
+        projectId: project.id,
+        sessionId: optimisticSessionId,
+        previousSessionId: draftSessionId || outgoingSessionId,
+        turnId,
+        kind: 'reasoning',
+        status: 'running',
+        label: '正在思考',
+        transient: true,
+        startedAt: submittedAt,
+        timestamp: submittedAt
+      })
+    );
     markRun?.({
       source: 'local-optimistic',
       projectId: project.id,

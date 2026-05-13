@@ -14,7 +14,7 @@
 import { Composer } from '../composer/Composer.jsx';
 import { ChatPane } from '../chat/ChatPane.jsx';
 import { ImagePreviewModal } from '../chat/ImagePreview.jsx';
-import { ConnectionRecoveryCard, DocsPanel, Drawer, GitPanel, ToastStack, TopBar } from '../panels/index.js';
+import { ConnectionRecoveryCard, DocsPanel, Drawer, GitPanel, PwaUpdatePrompt, ToastStack, TopBar } from '../panels/index.js';
 
 export function AppShell({ shellClass, panelProps, drawerProps, chatProps, composerProps }) {
   const {
@@ -23,6 +23,7 @@ export function AppShell({ shellClass, panelProps, drawerProps, chatProps, compo
     gitPanelProps,
     recoveryCardProps,
     toastStackProps,
+    pwaUpdateProps,
     imagePreviewProps
   } = panelProps;
 
@@ -34,6 +35,7 @@ export function AppShell({ shellClass, panelProps, drawerProps, chatProps, compo
       <GitPanel {...gitPanelProps} />
       <ConnectionRecoveryCard {...recoveryCardProps} />
       <ToastStack {...toastStackProps} />
+      <PwaUpdatePrompt {...pwaUpdateProps} />
       <ChatPane {...chatProps} />
       <Composer {...composerProps} />
       <ImagePreviewModal {...imagePreviewProps} />

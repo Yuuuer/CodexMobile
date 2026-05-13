@@ -21,19 +21,19 @@ test('bridgeConnectionLabel shows idle desktop IPC as mirror-only sync', () => {
   assert.match(label.description, /移动端发送固定走后台 Codex/);
 });
 
-test('bridgeConnectionLabel keeps running label compact while preserving source classes', () => {
+test('bridgeConnectionLabel shows runtime channel instead of activity summary', () => {
   const desktop = bridgeConnectionLabel('connected', { connected: true, mode: 'desktop-ipc' }, {
     selectedSession: { id: 'thread-1' },
-    selectedRuntime: { status: 'running', source: 'desktop-ipc' }
+    selectedRuntime: { status: 'running', source: 'desktop-ipc', label: '正在思考' }
   });
   const headless = bridgeConnectionLabel('connected', { connected: true, mode: 'desktop-ipc' }, {
     selectedSession: { id: 'thread-1' },
-    selectedRuntime: { status: 'running', source: 'headless-local' }
+    selectedRuntime: { status: 'running', source: 'headless-local', label: '正在搜索文件' }
   });
 
-  assert.equal(desktop.label, '正在运行');
+  assert.equal(desktop.label, '桌面端运行中');
   assert.match(desktop.className, /is-thread-ipc/);
-  assert.equal(headless.label, '正在运行');
+  assert.equal(headless.label, '正在后台运行 Codex');
   assert.match(headless.className, /is-headless/);
 });
 
@@ -43,8 +43,33 @@ test('bridgeConnectionLabel avoids claiming IPC route before running source is k
     selectedRuntime: { status: 'running' }
   });
 
-  assert.equal(label.label, '正在运行');
+  assert.equal(label.label, '正在运行 Codex');
   assert.match(label.description, /等待 sync runtime/);
+});
+
+test('bridgeConnectionLabel switches queued and failure channel labels', () => {
+  assert.equal(
+    bridgeConnectionLabel('connected', { connected: true, mode: 'desktop-ipc' }, {
+      selectedRuntime: { status: 'queued', source: 'headless-local' }
+    }).label,
+    '后台排队中'
+  );
+  assert.equal(
+    bridgeConnectionLabel('connected', { connected: true, mode: 'desktop-ipc' }, {
+      selectedRuntime: { status: 'failed', source: 'headless-local', label: '工具调用失败' }
+    }).label,
+    '后台 Codex 运行失败'
+  );
+});
+
+test('bridgeConnectionLabel falls back to idle bridge label after completed runtime notice', () => {
+  assert.equal(
+    bridgeConnectionLabel('connected', { connected: true, mode: 'desktop-ipc' }, {
+      selectedSession: { id: 'thread-1' },
+      selectedRuntime: { status: 'completed', source: 'headless-local' }
+    }).label,
+    '已同步'
+  );
 });
 
 test('bridgeConnectionLabel uses compact background and disconnected labels', () => {

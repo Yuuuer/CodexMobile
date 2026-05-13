@@ -71,21 +71,84 @@
 
 .activity-timeline {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   max-width: min(100%, 736px);
   margin-top: 10px;
   margin-left: 9px;
-  padding: 1px 0 3px 13px;
-  border-left: 1px solid rgba(17, 24, 39, 0.12);
+  padding: 1px 0 3px 0;
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
 }
 
 [data-theme="dark"] .activity-timeline {
-  border-color: rgba(255, 255, 255, 0.14);
   background: transparent;
   box-shadow: none;
+}
+
+.activity-segment {
+  position: relative;
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding-left: 16px;
+}
+
+.activity-segment::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: -14px;
+  left: 2px;
+  width: 1px;
+  background: rgba(17, 24, 39, 0.12);
+}
+
+.activity-segment:last-child::before {
+  bottom: 6px;
+}
+
+.activity-segment-node {
+  position: absolute;
+  top: 8px;
+  left: -1px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(17, 24, 39, 0.18);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.82);
+}
+
+.activity-segment.has-text .activity-segment-node {
+  border-color: rgba(44, 118, 255, 0.42);
+  background: #3b82f6;
+}
+
+.activity-segment-text,
+.activity-segment-tools {
+  min-width: 0;
+}
+
+.activity-segment-tools {
+  display: grid;
+  gap: 6px;
+  padding-left: 1px;
+}
+
+[data-theme="dark"] .activity-segment::before {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+[data-theme="dark"] .activity-segment-node {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: #18181b;
+  box-shadow: 0 0 0 3px rgba(5, 5, 6, 0.94);
+}
+
+[data-theme="dark"] .activity-segment.has-text .activity-segment-node {
+  border-color: rgba(96, 165, 250, 0.62);
+  background: #60a5fa;
 }
 
 .activity-text {
@@ -107,6 +170,16 @@
   line-height: 17px;
 }
 
+.activity-live.is-thinking {
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 9px;
+  border: 1px solid rgba(16, 163, 127, 0.16);
+  border-radius: 8px;
+  color: #256f61;
+  background: rgba(16, 163, 127, 0.075);
+}
+
 .activity-live-dot {
   width: 5px;
   height: 5px;
@@ -117,6 +190,12 @@
 
 [data-theme="dark"] .activity-live {
   color: #a1a1aa;
+}
+
+[data-theme="dark"] .activity-live.is-thinking {
+  border-color: rgba(52, 211, 153, 0.22);
+  color: #9be2c7;
+  background: rgba(16, 185, 129, 0.12);
 }
 
 [data-theme="dark"] .activity-summary-title {
@@ -586,13 +665,17 @@
 }
 
 .activity-diff-shell {
+  max-width: 100%;
+  min-width: 0;
   margin: 0;
   border-top: 1px solid rgba(17, 24, 39, 0.08);
   background: #fbfbfc;
 }
 
 .activity-diff-view {
+  width: 100%;
   max-height: 320px;
+  min-width: 0;
   margin: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -605,6 +688,8 @@
 .activity-diff-row {
   display: grid;
   grid-template-columns: 34px 34px 22px minmax(0, 1fr);
+  align-items: stretch;
+  width: 100%;
   min-width: 0;
 }
 
@@ -626,13 +711,38 @@
 
 .activity-diff-row code {
   display: block;
+  max-width: 100%;
   min-width: 0;
   padding: 0 8px;
+  overflow: visible;
   color: #2f343b;
   background: transparent;
-  white-space: pre-wrap;
+  white-space: break-spaces;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .activity-diff-view {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .activity-diff-row {
+    grid-template-columns: 28px 28px 18px minmax(0, 1fr);
+  }
+
+  .activity-diff-num {
+    padding: 0 5px;
+  }
+
+  .activity-diff-mark {
+    padding: 0 4px;
+  }
+
+  .activity-diff-row code {
+    padding: 0 6px;
+  }
 }
 
 .activity-diff-row.is-add {

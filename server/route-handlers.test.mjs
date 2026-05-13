@@ -98,6 +98,10 @@ test('chat route handler routes send and abort through chat service', async () =
       abortChat(body, options) {
         calls.push({ name: 'abort', body, options });
         return true;
+      },
+      async compactChat(body, options) {
+        calls.push({ name: 'compact', body, options });
+        return { accepted: true, sessionId: body.sessionId };
       }
     },
     remoteAddress: () => '127.0.0.1'
@@ -113,7 +117,14 @@ test('chat route handler routes send and abort through chat service', async () =
   const abortRes = createResponse();
   assert.equal(await callWithBody(handler, abortReq, abortRes, new URL('http://local/api/chat/abort')), true);
   assert.deepEqual(JSON.parse(abortRes.body), { aborted: true });
-  assert.deepEqual(calls.map((call) => call.name), ['send', 'abort']);
+
+  const compactReq = createRequest('POST', { projectId: 'project-1', sessionId: 'thread-1' });
+  const compactRes = createResponse();
+  assert.equal(await callWithBody(handler, compactReq, compactRes, new URL('http://local/api/chat/compact')), true);
+  assert.equal(compactRes.statusCode, 202);
+  assert.deepEqual(JSON.parse(compactRes.body), { accepted: true, sessionId: 'thread-1' });
+
+  assert.deepEqual(calls.map((call) => call.name), ['send', 'abort', 'compact']);
 });
 
 test('file route handler searches project files and preserves project not found response', async () => {

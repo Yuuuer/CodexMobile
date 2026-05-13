@@ -14,12 +14,12 @@
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatDuration, formatDurationMs } from '../app/session-utils.js';
-import { activityCardShouldOpen, effectiveActivityMessageIsRunning } from './activity-card-state.js';
+import { effectiveActivityMessageIsRunning, initialActivityCardOpenState, nextActivityCardOpenState } from './activity-card-state.js';
 import { isVisibleActivityStep, shouldRenderActivityMessageInChat } from './activity-model.js';
 import { ActivityTimeline } from './ActivityTimeline.jsx';
 import { projectActivityView } from './activity-timeline-projection.js';
 
-export function ActivityMessage({ message, now = Date.now(), forceRunning = false }) {
+export function ActivityMessage({ message, now = Date.now(), forceRunning = false, forceOpen = false }) {
   if (!shouldRenderActivityMessageInChat(message)) {
     return null;
   }
@@ -29,15 +29,15 @@ export function ActivityMessage({ message, now = Date.now(), forceRunning = fals
   const visibleSteps = activities.filter((activity) => isVisibleActivityStep(activity, message.status));
   const { timeRange, timeline } = projectActivityView(visibleSteps, { running });
   const hasProcess = timeline.length > 0;
-  const [open, setOpen] = useState(() => activityCardShouldOpen({ running, hasProcess }));
+  const [open, setOpen] = useState(() => initialActivityCardOpenState({ running, hasProcess, forceOpen }));
   const startedAt = message.startedAt || timeRange.startedAt || message.timestamp;
   const endedAt = running ? now : message.completedAt || timeRange.endedAt || message.timestamp || now;
   const duration = !running ? formatDurationMs(message.durationMs) || formatDuration(startedAt, endedAt) : formatDuration(startedAt, endedAt);
   const headline = failed ? '处理失败' : running ? '处理中' : '已处理';
 
   useEffect(() => {
-    setOpen(activityCardShouldOpen({ running, hasProcess }));
-  }, [message.id, running, hasProcess]);
+    setOpen((previousOpen) => nextActivityCardOpenState({ previousOpen, running, hasProcess, forceOpen }));
+  }, [message.id, running, hasProcess, forceOpen]);
 
   return (
     <div className="message-row is-activity">
@@ -63,6 +63,7 @@ export function ActivityMessage({ message, now = Date.now(), forceRunning = fals
         {open && hasProcess ? (
           <ActivityTimeline
             timeline={timeline}
+            detailsOpen={open}
           />
         ) : null}
       </div>

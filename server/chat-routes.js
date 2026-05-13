@@ -81,6 +81,17 @@ export function createChatRouteHandler({
       return true;
     }
 
+    if (method === 'POST' && pathname === '/api/chat/compact') {
+      const body = await readBody(req);
+      try {
+        const result = await chatService.compactChat(body, { remoteAddress: remoteAddress(req) });
+        sendJson(res, 202, result);
+      } catch (error) {
+        sendJson(res, error.statusCode || 500, { error: error.message || 'Failed to compact chat context' });
+      }
+      return true;
+    }
+
     if (method === 'POST' && pathname === '/api/chat/abort') {
       const body = await readBody(req);
       try {

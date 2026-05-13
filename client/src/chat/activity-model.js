@@ -4,7 +4,7 @@
  * Keywords: activity message, status message, merge, codex payload
  *
  * Exports:
- * - 无 default；含计划正文提取、活动步骤构建、消息流签名、upsertStatusMessage/upsertActivityMessage、mergeLoadedMessagesPreservingActivity 等大量会话层工具（详见模块内 export）。
+ * - 无 default；含计划正文提取、活动步骤构建、消息流签名、latestActivityMessageIdForRuntime、upsertStatusMessage/upsertActivityMessage、mergeLoadedMessagesPreservingActivity 等大量会话层工具（详见模块内 export）。
  *
  * Inward: activity-display、activity-dedupe、activity-merge、../app/session-utils。
  *
@@ -547,7 +547,7 @@ export function isPlaceholderActivityMessage(message) {
   }
   return !activities.some((activity) => {
     if (isThinkingActivityStep(activity)) {
-      return false;
+      return ['running', 'queued'].includes(String(message.status || activity.status || ''));
     }
     return isVisibleActivityStep(activity, message.status);
   });
@@ -561,6 +561,78 @@ export function shouldRenderActivityMessageInChat(message) {
     return false;
   }
   return !isPlaceholderActivityMessage(message);
+}
+
+export function activityMessageHasVisibleProcess(message) {
+  if (message?.role !== 'activity' || !shouldRenderActivityMessageInChat(message)) {
+    return false;
+  }
+  const activities = Array.isArray(message.activities) ? message.activities : [];
+  return activities.some((activity) => isVisibleActivityStep(activity, message.status));
+}
+
+export function latestActivityMessageIdForRuntime(messages = [], {
+  running = false,
+  activeRunKeys = [],
+  runtimeStartedAt = null
+} = {}) {
+  if (!running) {
+    return '';
+  }
+  const keys = new Set((activeRunKeys || []).map((key) => String(key || '').trim()).filter(Boolean));
+  let fallbackId = '';
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!activityMessageHasVisibleProcess(message)) {
+      continue;
+    }
+    const freshForRuntime = activityMessageTouchesRuntimeWindow(message, runtimeStartedAt);
+    if (!fallbackId && freshForRuntime) {
+      fallbackId = message.id || '';
+    }
+    if (keys.size && activityMessageMatchesActiveRunKeys(message, keys, freshForRuntime)) {
+      return message.id || '';
+    }
+  }
+  return fallbackId;
+}
+
+function activityMessageMatchesActiveRunKeys(message, keys, freshForRuntime) {
+  const turnKeys = [message?.turnId, message?.clientTurnId]
+    .map((key) => String(key || '').trim())
+    .filter(Boolean);
+  if (turnKeys.some((key) => keys.has(key))) {
+    return true;
+  }
+  return Boolean(freshForRuntime && payloadRunKeys(message).some((key) => keys.has(String(key))));
+}
+
+function activityMessageTouchesRuntimeWindow(message, runtimeStartedAt) {
+  const runtimeStartMs = runtimeStartedAt ? new Date(runtimeStartedAt).getTime() : NaN;
+  if (!Number.isFinite(runtimeStartMs)) {
+    return true;
+  }
+  const latestMs = latestActivityMessageTimestampMs(message);
+  return Number.isFinite(latestMs) && latestMs >= runtimeStartMs - 1000;
+}
+
+function latestActivityMessageTimestampMs(message) {
+  const values = [
+    message?.timestamp,
+    message?.startedAt,
+    message?.completedAt,
+    ...(Array.isArray(message?.activities)
+      ? message.activities.flatMap((activity) => [
+        activity?.timestamp,
+        activity?.startedAt,
+        activity?.completedAt
+      ])
+      : [])
+  ];
+  return values.reduce((latest, value) => {
+    const time = value ? new Date(value).getTime() : NaN;
+    return Number.isFinite(time) && time > latest ? time : latest;
+  }, Number.NEGATIVE_INFINITY);
 }
 
 export function completeActivityMessagesForTurn(current, payload) {
@@ -687,6 +759,7 @@ export function upsertStatusMessage(current, payload) {
     normalizedPayload.completedAt ||
     (['completed', 'failed'].includes(normalizedPayload.status) ? normalizedPayload.timestamp : '') ||
     '';
+  const activity = activityStepFromPayload(normalizedPayload);
   const nextMessage = {
     id,
     role: 'activity',
@@ -695,7 +768,7 @@ export function upsertStatusMessage(current, payload) {
     sessionId: normalizedPayload.sessionId || previous?.sessionId || null,
     previousSessionId: normalizedPayload.previousSessionId || previous?.previousSessionId || null,
     source: normalizedPayload.source || previous?.source || null,
-    transient: normalizedPayload.transient ?? previous?.transient ?? false,
+    transient: activityMessageTransientState(previous, normalizedPayload, activity),
     content: isTurnLevel ? (normalizedPayload.label || previous?.content || '正在处理') : (previous?.content || '正在处理'),
     label: isTurnLevel ? (normalizedPayload.label || previous?.label || '正在处理') : (previous?.label || '正在处理'),
     detail,
@@ -705,7 +778,7 @@ export function upsertStatusMessage(current, payload) {
     startedAt: previous?.startedAt || normalizedPayload.startedAt || normalizedPayload.timestamp || new Date().toISOString(),
     completedAt: previous?.completedAt || terminalTimestamp || null,
     durationMs: previous?.durationMs || normalizedPayload.durationMs || null,
-    activities: mergeActivityStep(previous?.activities || [], activityStepFromPayload(normalizedPayload))
+    activities: mergeActivityStep(previous?.activities || [], activity)
   };
 
   if (existingIndex >= 0) {
@@ -714,6 +787,39 @@ export function upsertStatusMessage(current, payload) {
     return next;
   }
   return [...current, nextMessage];
+}
+
+function hasConcreteActivityPayload(payload = {}) {
+  return Boolean(
+    payload.command ||
+    payload.detail ||
+    payload.output ||
+    payload.error ||
+    payload.toolName ||
+    payload.name ||
+    (Array.isArray(payload.fileChanges) && payload.fileChanges.length > 0)
+  );
+}
+
+function activityMessageTransientState(previous, payload = {}, activity = null) {
+  if (payload.transient !== undefined) {
+    return Boolean(payload.transient);
+  }
+  if (!previous?.transient) {
+    return false;
+  }
+  const source = String(payload.source || '').trim();
+  const kind = String(payload.kind || '').trim();
+  if (source && source !== 'local-optimistic') {
+    return false;
+  }
+  if (hasConcreteActivityPayload(payload)) {
+    return false;
+  }
+  if (activity && !['reasoning', 'turn'].includes(kind)) {
+    return false;
+  }
+  return true;
 }
 
 export function upsertActivityMessage(current, payload) {
@@ -736,6 +842,16 @@ export function upsertActivityMessage(current, payload) {
   const activities = activity
     ? mergeActivityStep(previous?.activities || [], activity)
     : previous?.activities || [];
+  const payloadStatus = String(payload.status || '').trim();
+  const payloadIsTerminal = ['completed', 'failed'].includes(payloadStatus);
+  const hasRunningActivity = activities.some((item) => item?.status === 'running' || item?.status === 'queued');
+  const messageStatus = isTurnLevel
+    ? (payload.status || previous?.status || 'running')
+    : hasRunningActivity
+      ? 'running'
+      : payloadIsTerminal
+        ? payloadStatus
+        : (payload.status || previous?.status || 'running');
 
   const nextMessage = {
     id,
@@ -745,18 +861,18 @@ export function upsertActivityMessage(current, payload) {
     sessionId: payload.sessionId || previous?.sessionId || null,
     previousSessionId: payload.previousSessionId || previous?.previousSessionId || null,
     source: payload.source || previous?.source || null,
-    transient: payload.transient ?? previous?.transient ?? false,
+    transient: activityMessageTransientState(previous, payload, activity),
     content: previous?.content || '正在处理',
     label: previous?.label || '正在处理',
     detail: payload.detail || previous?.detail || activity?.detail || '',
     kind: payload.kind || previous?.kind || 'activity',
-    status: isTurnLevel ? (payload.status || previous?.status || 'running') : (previous?.status || 'running'),
+    status: messageStatus,
     timestamp: previous?.timestamp || payload.timestamp || new Date().toISOString(),
     startedAt: previous?.startedAt || payload.startedAt || previous?.timestamp || payload.timestamp || new Date().toISOString(),
     completedAt:
       previous?.completedAt ||
       payload.completedAt ||
-      (isTurnLevel && ['completed', 'failed'].includes(payload.status) ? payload.timestamp || new Date().toISOString() : null),
+      ((isTurnLevel || payloadIsTerminal) && ['completed', 'failed'].includes(messageStatus) ? payload.timestamp || new Date().toISOString() : null),
     durationMs: previous?.durationMs || payload.durationMs || null,
     activities
   };

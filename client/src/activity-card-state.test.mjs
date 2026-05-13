@@ -10,7 +10,9 @@ import test from 'node:test';
 import {
   activityCardShouldOpen,
   activityMessageIsRunning,
-  effectiveActivityMessageIsRunning
+  effectiveActivityMessageIsRunning,
+  initialActivityCardOpenState,
+  nextActivityCardOpenState
 } from './chat/activity-card-state.js';
 
 test('activity card opens only while a visible process is running', () => {
@@ -47,4 +49,10 @@ test('activity card can follow external runtime while desktop projection is stal
   assert.equal(activityMessageIsRunning(message), false);
   assert.equal(effectiveActivityMessageIsRunning({ message, forceRunning: true }), true);
   assert.equal(activityCardShouldOpen({ running: true, hasProcess: true }), true);
+});
+
+test('activity card folds a forced-open process after runtime completion', () => {
+  assert.equal(initialActivityCardOpenState({ running: true, hasProcess: true }), true);
+  assert.equal(nextActivityCardOpenState({ previousOpen: true, running: false, hasProcess: true }), false);
+  assert.equal(nextActivityCardOpenState({ previousOpen: false, running: false, hasProcess: true }), false);
 });

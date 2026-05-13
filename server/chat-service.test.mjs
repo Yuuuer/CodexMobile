@@ -124,6 +124,87 @@ test('abortChat records and broadcasts an aborted turn even after the backend ru
   assert.equal(broadcasts.at(-1).sessionId, 'thread-1');
 });
 
+test('compactChat calls desktop compact and broadcasts detected context state', async () => {
+  let compactedSessionId = null;
+  const { service, broadcasts } = makeChatService({
+    compactCodexThread: async (sessionId) => {
+      compactedSessionId = sessionId;
+      return { compacted: true };
+    }
+  });
+
+  const result = await service.compactChat({
+    projectId: 'project-1',
+    sessionId: 'thread-1'
+  });
+
+  assert.deepEqual(result, { accepted: true, sessionId: 'thread-1', result: { compacted: true } });
+  assert.equal(compactedSessionId, 'thread-1');
+  assert.equal(broadcasts.some((payload) =>
+    payload.type === 'context-status-update' &&
+    payload.sessionId === 'thread-1' &&
+    payload.autoCompact?.detected === true
+  ), true);
+});
+
+test('compactChat broadcasts a running activity before desktop compact finishes', async () => {
+  let resolveCompact;
+  const compactPromise = new Promise((resolve) => {
+    resolveCompact = resolve;
+  });
+  const { service, broadcasts } = makeChatService({
+    compactCodexThread: async () => compactPromise
+  });
+
+  const pending = service.compactChat({
+    projectId: 'project-1',
+    sessionId: 'thread-1',
+    clientActionId: 'compact-action-1'
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const running = broadcasts.find((payload) =>
+    payload.type === 'activity-update' &&
+    payload.kind === 'context_compaction' &&
+    payload.status === 'running'
+  );
+  assert.equal(running?.label, '正在压缩上下文');
+  assert.equal(running?.messageId, 'compact-action-1');
+
+  resolveCompact({ compacted: true });
+  await pending;
+  assert.equal(broadcasts.some((payload) =>
+    payload.type === 'activity-update' &&
+    payload.messageId === running.messageId &&
+    payload.status === 'completed' &&
+    payload.label === '上下文已压缩'
+  ), true);
+});
+
+test('compactChat broadcasts a failed activity when desktop compact fails', async () => {
+  const { service, broadcasts } = makeChatService({
+    compactCodexThread: async () => {
+      throw new Error('desktop compact failed');
+    }
+  });
+
+  await assert.rejects(
+    service.compactChat({
+      projectId: 'project-1',
+      sessionId: 'thread-1'
+    }),
+    /desktop compact failed/
+  );
+
+  assert.equal(broadcasts.some((payload) =>
+    payload.type === 'activity-update' &&
+    payload.kind === 'context_compaction' &&
+    payload.status === 'failed' &&
+    payload.label === '上下文压缩失败' &&
+    /desktop compact failed/.test(payload.detail)
+  ), true);
+});
+
 test('sendChat creates draft threads through headless even when desktop IPC cannot create desktop threads', async () => {
   let runPayload = null;
   const { service, broadcasts } = makeChatService({

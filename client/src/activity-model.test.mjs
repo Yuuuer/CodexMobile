@@ -14,6 +14,7 @@ import {
   dismissPlanImplementationPrompts,
   isPlaceholderActivityMessage,
   isVisibleActivityStep,
+  latestActivityMessageIdForRuntime,
   removeStalePlanRequestsAfterUserMessages,
   shouldRenderActivityMessageInChat,
   upsertActivityMessage,
@@ -114,6 +115,31 @@ test('upsertActivityMessage also merges desktop activity updates by client turn 
   assert.deepEqual(result[0].activities.map((activity) => activity.kind), ['reasoning', 'mcp_tool_call']);
 });
 
+test('upsertActivityMessage completes standalone context compaction cards', () => {
+  const current = upsertActivityMessage([], {
+    sessionId: 'thread-1',
+    messageId: 'compact-1',
+    kind: 'context_compaction',
+    status: 'running',
+    label: '正在压缩上下文'
+  });
+
+  const result = upsertActivityMessage(current, {
+    sessionId: 'thread-1',
+    messageId: 'compact-1',
+    kind: 'context_compaction',
+    status: 'completed',
+    label: '上下文已压缩',
+    timestamp: '2026-05-13T16:00:00.000Z'
+  });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].status, 'completed');
+  assert.equal(result[0].completedAt, '2026-05-13T16:00:00.000Z');
+  assert.equal(result[0].activities.length, 1);
+  assert.equal(result[0].activities[0].status, 'completed');
+});
+
 test('completeActivityMessagesForTurn marks running activity steps completed', () => {
   const result = completeActivityMessagesForTurn([
     {
@@ -171,15 +197,175 @@ test('completeActivityMessagesForTurn keeps pending plan implementation actionab
   assert.equal(result[0].activities[0].planImplementation.completed, false);
 });
 
-test('placeholder thinking activity is suppressed from chat stream', () => {
-  assert.equal(isPlaceholderActivityMessage({
+test('running thinking activity renders as a send placeholder', () => {
+  const message = {
     id: 'status-turn-1',
     role: 'activity',
     status: 'running',
     activities: [
       { id: 'thinking', kind: 'reasoning', label: '正在思考中', status: 'running' }
     ]
+  };
+
+  assert.equal(isPlaceholderActivityMessage(message), false);
+  assert.equal(shouldRenderActivityMessageInChat(message), true);
+});
+
+test('completed thinking-only activity is suppressed from chat stream', () => {
+  assert.equal(isPlaceholderActivityMessage({
+    id: 'status-turn-1',
+    role: 'activity',
+    status: 'completed',
+    activities: [
+      { id: 'thinking', kind: 'reasoning', label: '正在思考中', status: 'completed' }
+    ]
   }), true);
+});
+
+test('upsertStatusMessage appends local thinking placeholder after optimistic user message', () => {
+  const result = upsertStatusMessage([
+    {
+      id: 'local-1',
+      role: 'user',
+      content: '修一下移动端占位',
+      sessionId: 'thread-1',
+      turnId: 'turn-1'
+    }
+  ], {
+    source: 'local-optimistic',
+    sessionId: 'thread-1',
+    turnId: 'turn-1',
+    kind: 'reasoning',
+    status: 'running',
+    label: '正在思考',
+    transient: true,
+    timestamp: '2026-05-13T12:00:00.000Z'
+  });
+
+  assert.equal(result.length, 2);
+  assert.equal(result[1].role, 'activity');
+  assert.equal(result[1].source, 'local-optimistic');
+  assert.equal(result[1].transient, true);
+  assert.equal(result[1].activities[0].kind, 'reasoning');
+  assert.equal(shouldRenderActivityMessageInChat(result[1]), false);
+});
+
+test('real activity update takes over a transient optimistic thinking card', () => {
+  const current = upsertStatusMessage([], {
+    source: 'local-optimistic',
+    sessionId: 'draft-1',
+    turnId: 'turn-1',
+    kind: 'reasoning',
+    status: 'running',
+    label: '正在思考',
+    transient: true,
+    timestamp: '2026-05-13T12:00:00.000Z'
+  });
+
+  const result = upsertActivityMessage(current, {
+    source: 'headless-local',
+    sessionId: 'thread-1',
+    previousSessionId: 'draft-1',
+    turnId: 'turn-1',
+    messageId: 'tool-1',
+    kind: 'mcp_tool_call',
+    status: 'running',
+    label: '正在完成一步操作',
+    detail: 'functions.exec_command',
+    toolName: 'exec_command',
+    timestamp: '2026-05-13T12:00:03.000Z'
+  });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 'status-turn-1');
+  assert.equal(result[0].transient, false);
+  assert.equal(result[0].sessionId, 'thread-1');
+  assert.deepEqual(result[0].activities.map((activity) => activity.kind), ['reasoning', 'mcp_tool_call']);
+  assert.equal(shouldRenderActivityMessageInChat(result[0]), true);
+});
+
+test('latestActivityMessageIdForRuntime force-opens completed desktop activity while runtime is active', () => {
+  const messages = [
+    {
+      id: 'activity-old',
+      role: 'activity',
+      sessionId: 'thread-old',
+      status: 'completed',
+      activities: [
+        { id: 'old-command', kind: 'command_execution', label: '运行测试', status: 'completed', command: 'npm test' }
+      ]
+    },
+    {
+      id: 'activity-current',
+      role: 'activity',
+      sessionId: 'thread-1',
+      turnId: 'desktop-turn-1',
+      status: 'completed',
+      activities: [
+        { id: 'current-command', kind: 'command_execution', label: '本地任务已处理', status: 'completed', command: 'node --test' }
+      ]
+    }
+  ];
+
+  assert.equal(
+    latestActivityMessageIdForRuntime(messages, { running: true, activeRunKeys: ['thread-1'] }),
+    'activity-current'
+  );
+  assert.equal(
+    latestActivityMessageIdForRuntime(messages, { running: false, activeRunKeys: ['thread-1'] }),
+    ''
+  );
+});
+
+test('latestActivityMessageIdForRuntime falls back to the latest visible process during desktop runtime', () => {
+  const messages = [
+    {
+      id: 'activity-current',
+      role: 'activity',
+      sessionId: 'thread-1',
+      status: 'completed',
+      activities: [
+        { id: 'command', kind: 'command_execution', label: '本地任务已处理', status: 'completed', command: 'rg foo' }
+      ]
+    }
+  ];
+
+  assert.equal(
+    latestActivityMessageIdForRuntime(messages, { running: true, activeRunKeys: ['desktop-turn-unseen'] }),
+    'activity-current'
+  );
+});
+
+test('latestActivityMessageIdForRuntime ignores stale same-thread cards before new runtime output', () => {
+  const messages = [
+    {
+      id: 'activity-previous-turn',
+      role: 'activity',
+      sessionId: 'thread-1',
+      status: 'completed',
+      timestamp: '2026-05-13T08:39:00.000Z',
+      completedAt: '2026-05-13T08:39:02.000Z',
+      activities: [
+        {
+          id: 'old-command',
+          kind: 'command_execution',
+          label: '本地任务已处理',
+          status: 'completed',
+          command: 'npm test',
+          timestamp: '2026-05-13T08:39:01.000Z'
+        }
+      ]
+    }
+  ];
+
+  assert.equal(
+    latestActivityMessageIdForRuntime(messages, {
+      running: true,
+      activeRunKeys: ['thread-1'],
+      runtimeStartedAt: '2026-05-13T08:40:00.000Z'
+    }),
+    ''
+  );
 });
 
 test('activity with concrete work is not treated as placeholder', () => {

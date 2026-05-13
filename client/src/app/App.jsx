@@ -21,7 +21,7 @@ import { DEFAULT_MODEL_SPEED, normalizeModelSpeed } from '../composer/composer-o
 import { useComposerSelections } from '../composer/useComposerSelections.js';
 import { useQueueDrafts } from '../composer/useQueueDrafts.js';
 import { connectionRecoveryState } from '../connection-recovery.js';
-import { normalizeContextStatus } from './context-status.js';
+import { mergeContextStatus, normalizeContextStatus } from './context-status.js';
 import { DEFAULT_REASONING_EFFORT, DEFAULT_STATUS, REASONING_DEFAULT_VERSION } from './defaults.js';
 import { appReducer, createInitialUiState, THEME_KEY } from './AppState.js';
 import { useNotifications } from '../panels/useNotifications.js';
@@ -30,11 +30,13 @@ import { useConnectionActions } from './useConnectionActions.js';
 import { useDocsActions } from './useDocsActions.js';
 import { useFileUploads } from './useFileUploads.js';
 import { useAppWebSocket } from './useAppWebSocket.js';
+import { upsertActivityMessage } from '../chat/activity-model.js';
 import { useSessionLivePolling } from './useSessionLivePolling.js';
 import { useSessionActions } from './useSessionActions.js';
 import { useTurnSubmission } from './useTurnSubmission.js';
 import { useTurnRuntime } from './useTurnRuntime.js';
 import { useViewportSizing } from './useViewportSizing.js';
+import { usePwaUpdate } from './pwa-update.js';
 import { applyPwaTheme } from './pwa-theme.js';
 import { mergeModelSettingsIntoStatus, nextSyncedComposerSettings } from './model-sync.js';
 import { rememberSelectedSession } from './selection-persistence.js';
@@ -78,6 +80,7 @@ export default function App() {
     showToast,
     enableNotifications
   } = useNotifications();
+  const pwaUpdate = usePwaUpdate();
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [expandedProjectIds, setExpandedProjectIds] = useState({});
@@ -175,8 +178,10 @@ export default function App() {
   const selectedRunning = selectedSessionIsRunning({ running });
   const drawerRunningById = syncRunningById;
   const composerRunStatus = useMemo(
-    () => buildComposerRunStatus(messages, selectedRunning, activityClockNow),
-    [messages, selectedRunning, activityClockNow]
+    () => buildComposerRunStatus(messages, selectedRunning, activityClockNow, {
+      runtimeStartedAt: selectedRuntime?.startedAt || selectedRuntime?.updatedAt || null
+    }),
+    [messages, selectedRunning, activityClockNow, selectedRuntime?.startedAt, selectedRuntime?.updatedAt]
   );
   const selectedActiveRunKeys = useMemo(() => {
     if (!selectedRunning) {
@@ -628,6 +633,94 @@ export default function App() {
     }
   }, [handleSubmit, selectedCollaborationMode]);
 
+  const handleCompactContext = useCallback(async () => {
+    const project = selectedProjectRef.current || selectedProject;
+    const session = selectedSessionRef.current || selectedSession;
+    if (!project?.id || !session?.id || isDraftSession(session)) {
+      showToast({
+        level: 'warning',
+        title: '无法压缩上下文',
+        body: '请先打开一个已有线程。'
+      });
+      return false;
+    }
+    const actionId = globalThis.crypto?.randomUUID?.() || `manual-context-compaction-${Date.now()}`;
+    const startedAt = new Date().toISOString();
+    setMessages((current) => upsertActivityMessage(current, {
+      projectId: project.id,
+      sessionId: session.id,
+      messageId: actionId,
+      kind: 'context_compaction',
+      status: 'running',
+      label: '正在压缩上下文',
+      startedAt,
+      timestamp: startedAt
+    }));
+    showToast({
+      level: 'info',
+      title: '正在压缩上下文',
+      body: '移动端会同步显示压缩进度。'
+    });
+    try {
+      await apiFetch('/api/chat/compact', {
+        method: 'POST',
+        timeoutMs: 35_000,
+        body: {
+          projectId: project.id,
+          sessionId: session.id,
+          clientActionId: actionId
+        }
+      });
+      const timestamp = new Date().toISOString();
+      setMessages((current) => upsertActivityMessage(current, {
+        projectId: project.id,
+        sessionId: session.id,
+        messageId: actionId,
+        kind: 'context_compaction',
+        status: 'completed',
+        label: '上下文已压缩',
+        startedAt,
+        completedAt: timestamp,
+        timestamp
+      }));
+      setContextStatus((current) => mergeContextStatus(current, {
+        autoCompact: {
+          detected: true,
+          status: 'detected',
+          lastCompactedAt: timestamp,
+          reason: '手动压缩上下文'
+        },
+        updatedAt: timestamp
+      }, DEFAULT_STATUS.context));
+      showToast({
+        level: 'success',
+        title: '上下文已压缩',
+        body: '当前线程的压缩结果已同步。'
+      });
+      return true;
+    } catch (error) {
+      const failedAt = new Date().toISOString();
+      setMessages((current) => upsertActivityMessage(current, {
+        projectId: project.id,
+        sessionId: session.id,
+        messageId: actionId,
+        kind: 'context_compaction',
+        status: 'failed',
+        label: '上下文压缩失败',
+        detail: error.message || '桌面端没有完成上下文压缩。',
+        startedAt,
+        completedAt: failedAt,
+        timestamp: failedAt
+      }));
+      showToast({
+        level: 'error',
+        title: '压缩失败',
+        body: error.message || '桌面端没有完成上下文压缩。'
+      });
+      return false;
+    }
+  }, [selectedProject, selectedSession, showToast]);
+
   if (!authenticated) {
     return <PairingScreen onPaired={bootstrap} />;
   }
@@ -681,6 +774,11 @@ export default function App() {
       toasts,
       onDismiss: dismissToast
     },
+    pwaUpdateProps: {
+      available: pwaUpdate.available,
+      onRefresh: pwaUpdate.refresh,
+      onDismiss: pwaUpdate.dismiss
+    },
     imagePreviewProps: {
       image: previewImage,
       onClose: () => setPreviewImage(null)
@@ -718,6 +816,7 @@ export default function App() {
     loadError: sessionLoadError,
     running: selectedRunning,
     activeRunKeys: selectedActiveRunKeys,
+    activeRuntimeStartedAt: selectedRuntime?.startedAt || selectedRuntime?.updatedAt || null,
     now: activityClockNow,
     onPreviewImage: setPreviewImage,
     onDeleteMessage: handleDeleteMessage,
@@ -762,7 +861,8 @@ export default function App() {
     queueDrafts,
     onRestoreQueueDraft: restoreQueueDraft,
     onRemoveQueueDraft: removeQueueDraft,
-    onSteerQueueDraft: steerQueueDraft
+    onSteerQueueDraft: steerQueueDraft,
+    onCompactContext: handleCompactContext
   };
 
   return (

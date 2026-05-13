@@ -20,6 +20,7 @@ const { DesktopIpcClient, desktopIpcMethodVersion } = desktopIpc;
 test('desktop mirror IPC methods use the current desktop protocol version', () => {
   assert.equal(desktopIpcMethodVersion('initialize'), 0);
   assert.equal(desktopIpcMethodVersion('thread-archived'), 2);
+  assert.equal(desktopIpcMethodVersion('thread-follower-compact-thread'), 1);
   assert.equal(desktopIpcMethodVersion('thread-follower-set-model-and-reasoning'), 1);
   assert.equal(desktopIpcMethodVersion('thread-stream-state-changed'), 6);
   assert.equal(desktopIpcMethodVersion('thread-follower-start-turn'), 0);
@@ -87,6 +88,48 @@ function readFrames(socket, count) {
     socket.once('error', reject);
   });
 }
+
+test('compactDesktopFollowerThread requests desktop context compaction', async () => {
+  assert.equal(typeof desktopIpc.compactDesktopFollowerThread, 'function');
+
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'codexmobile-ipc-test-'));
+  const socketPath = path.join(dir, 'ipc.sock');
+  const server = net.createServer();
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+
+  const accepted = new Promise((resolve) => server.once('connection', resolve));
+  const sent = desktopIpc.compactDesktopFollowerThread('thread-1', {
+    socketPath,
+    timeoutMs: 1000
+  });
+  const socket = await accepted;
+  const init = await readFrame(socket);
+  socket.write(frameFor({
+    type: 'response',
+    requestId: init.requestId,
+    resultType: 'success',
+    method: 'initialize',
+    result: { clientId: 'client-1' }
+  }));
+  const request = await readFrame(socket);
+  socket.write(frameFor({
+    type: 'response',
+    requestId: request.requestId,
+    resultType: 'success',
+    method: 'thread-follower-compact-thread',
+    result: { compacted: true }
+  }));
+  const result = await sent;
+
+  assert.deepEqual(result, { compacted: true });
+  assert.equal(request.type, 'request');
+  assert.equal(request.method, 'thread-follower-compact-thread');
+  assert.equal(request.version, 1);
+  assert.deepEqual(request.params, { conversationId: 'thread-1' });
+
+  server.close();
+  await fs.rm(dir, { recursive: true, force: true });
+});
 
 test('sendBroadcast writes desktop IPC broadcast frames', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'codexmobile-ipc-test-'));

@@ -5,7 +5,7 @@
  *
  * Exports:
  * - SLASH_COMMANDS — 内置指令与插入文案配置。
- * - detectComposerToken / replaceComposerToken / filteredSlashCommands — 编辑器辅助。
+ * - detectComposerToken / replaceComposerToken / filteredSlashCommands / exactSlashCommandForInput — 编辑器辅助。
  *
  * Inward: 无。
  *
@@ -27,8 +27,7 @@ export const SLASH_COMMANDS = [
     aliases: ['/compact'],
     title: '压缩上下文',
     description: '把旧上下文压缩成摘要，保持线程轻量',
-    action: 'insert-prompt',
-    prompt: '请压缩当前对话的旧上下文，保留关键决策、文件路径、未完成事项和后续执行入口。'
+    action: 'compact-context'
   },
   {
     id: 'review',
@@ -90,4 +89,17 @@ export function filteredSlashCommands(query, commands = SLASH_COMMANDS) {
       .map((item) => String(item).toLowerCase());
     return tokens.some((item) => item.includes(normalized));
   });
+}
+
+export function exactSlashCommandForInput(text, commands = SLASH_COMMANDS) {
+  const normalized = String(text || '').trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  return commands.find((command) => {
+    const values = [command.token, ...(command.aliases || [])]
+      .filter(Boolean)
+      .map((item) => String(item).trim().toLowerCase());
+    return values.includes(normalized);
+  }) || null;
 }

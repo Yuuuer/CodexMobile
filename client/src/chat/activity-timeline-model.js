@@ -4,7 +4,7 @@
  * Keywords: activity timeline, steps aggregation, file summary
  *
  * Exports:
- * - activityTimeRange、buildActivityTimeline、buildActivityFileSummary、activityDetailText、hasActivityStepDetail、activityBodyItemsForDisplay、activityStepDetailTitle、isSkillActivityStep 等。
+ * - activityTimeRange、buildActivityTimeline、activityTimelineSegments、buildActivityFileSummary、activityDetailText、hasActivityStepDetail、activityBodyItemsForDisplay、activityMetaShouldOpen、activityStepDetailShouldOpen、activityStepDetailTitle、isSkillActivityStep 等。
  *
  * Inward: ../activity-display、./activity-model（文案与思考步骤折叠）。
  *
@@ -81,7 +81,7 @@ export function buildActivityTimeline(steps, running) {
       timeline.push({
         id: `divider-${step.id}`,
         type: 'divider',
-        text: step.status === 'running' ? '正在自动压缩上下文' : '上下文已自动压缩'
+        text: String(step.label || '').trim() || (step.status === 'running' ? '正在压缩上下文' : '上下文已压缩')
       });
     } else if (isNarrativeActivity(step)) {
       flushBatch();
@@ -98,6 +98,51 @@ export function buildActivityTimeline(steps, running) {
   flushBatch();
 
   return timeline;
+}
+
+export function activityTimelineSegments(timeline) {
+  const segments = [];
+  let current = null;
+
+  function startSegment(textItem = null, fallbackItem = null) {
+    const id = textItem?.id || fallbackItem?.id || `segment-${segments.length}`;
+    current = {
+      id: `segment-${id}`,
+      type: 'segment',
+      textItem,
+      items: []
+    };
+    segments.push(current);
+    return current;
+  }
+
+  for (const item of Array.isArray(timeline) ? timeline : []) {
+    if (!item) {
+      continue;
+    }
+    if (item.type === 'text') {
+      startSegment(item);
+      continue;
+    }
+    if (item.type === 'divider') {
+      segments.push({
+        id: `segment-${item.id}`,
+        type: 'standalone',
+        item
+      });
+      current = null;
+      continue;
+    }
+    const target = current || startSegment(null, item);
+    target.items.push(item);
+  }
+
+  return segments.filter((segment) => {
+    if (segment.type === 'standalone') {
+      return Boolean(segment.item);
+    }
+    return Boolean(segment.textItem || segment.items.length);
+  });
 }
 
 function isContextCompactionActivity(step) {
@@ -397,6 +442,24 @@ export function activityBodyItemsForDisplay(visibleItems, overflowItems) {
     visibleBodyItems: Array.isArray(visibleItems) ? visibleItems : [],
     overflowBodyItems: Array.isArray(overflowItems) ? overflowItems : []
   };
+}
+
+export function activityMetaShouldOpen(item, { forceOpen = false } = {}) {
+  if (forceOpen) {
+    return true;
+  }
+  const items = [
+    ...(Array.isArray(item?.items) ? item.items : []),
+    ...(Array.isArray(item?.visibleItems) ? item.visibleItems : []),
+    ...(Array.isArray(item?.overflowItems) ? item.overflowItems : [])
+  ];
+  return items.some((step) => step?.status === 'running' || step?.status === 'queued');
+}
+
+export function activityStepDetailShouldOpen(step, { forceOpen = false } = {}) {
+  void step;
+  void forceOpen;
+  return false;
 }
 
 export function activityStepDetailTitle(step) {

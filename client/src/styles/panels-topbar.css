@@ -211,6 +211,15 @@
   animation: connectionPulse 1.6s ease-in-out infinite;
 }
 
+.connection-status.is-failed {
+  color: var(--danger);
+}
+
+.connection-status.is-failed .connection-dot {
+  background: currentColor;
+  opacity: 1;
+}
+
 .connection-status.is-headless,
 .connection-status.is-route-pending {
   color: #4b5563;
@@ -235,6 +244,10 @@
 
 [data-theme="dark"] .connection-status.is-running {
   color: #f4f4f5;
+}
+
+[data-theme="dark"] .connection-status.is-failed {
+  color: #fda4af;
 }
 
 [data-theme="dark"] .connection-status.is-headless,

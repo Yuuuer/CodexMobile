@@ -9,7 +9,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   activityBodyItemsForDisplay,
+  activityMetaShouldOpen,
   activityStepDetailTitle,
+  activityStepDetailShouldOpen,
+  activityTimelineSegments,
   buildActivityTimeline,
   isSkillActivityStep
 } from './chat/activity-timeline-model.js';
@@ -76,6 +79,66 @@ test('activity timeline keeps tool batches next to their matching commentary', (
   );
   assert.equal(timeline[1].items[0].command, 'git status --short');
   assert.equal(timeline[3].items[0].command, 'npm run build');
+});
+
+test('activity timeline labels manual context compaction states', () => {
+  const running = buildActivityTimeline([
+    {
+      id: 'compact-1',
+      kind: 'context_compaction',
+      label: '正在压缩上下文',
+      status: 'running'
+    }
+  ], true);
+  const completed = buildActivityTimeline([
+    {
+      id: 'compact-1',
+      kind: 'context_compaction',
+      label: '上下文已压缩',
+      status: 'completed'
+    }
+  ], false);
+
+  assert.equal(running[0].text, '正在压缩上下文');
+  assert.equal(completed[0].text, '上下文已压缩');
+});
+
+test('activityTimelineSegments groups each commentary with the following tool batch', () => {
+  const timeline = buildActivityTimeline([
+    {
+      id: 'commentary-1',
+      kind: 'agent_message',
+      label: '先看状态。'
+    },
+    {
+      id: 'command-1',
+      kind: 'command_execution',
+      label: '本地任务已处理',
+      command: 'git status --short',
+      status: 'completed'
+    },
+    {
+      id: 'commentary-2',
+      kind: 'agent_message',
+      label: '再跑构建。'
+    },
+    {
+      id: 'command-2',
+      kind: 'command_execution',
+      label: '本地任务已处理',
+      command: 'npm run build',
+      status: 'completed'
+    }
+  ], false);
+
+  const segments = activityTimelineSegments(timeline);
+
+  assert.deepEqual(segments.map((segment) => [segment.type, segment.textItem?.text, segment.items?.length || 0]), [
+    ['segment', '先看状态。', 1],
+    ['segment', '再跑构建。', 1]
+  ]);
+  assert.equal(segments[0].items[0].items[0].command, 'git status --short');
+  assert.equal(segments[1].items[0].items[0].command, 'npm run build');
 });
 
 test('activity step detail titles describe read and search commands semantically', () => {
@@ -154,4 +217,25 @@ test('activity timeline counts command actions instead of paths found in output'
   ], false);
 
   assert.equal(timeline[0].title, '已搜索 1 次，已探索 1 个文件');
+});
+
+test('outer process can open tool groups while command details stay folded', () => {
+  const item = {
+    type: 'meta',
+    items: [
+      {
+        id: 'command-1',
+        type: 'command',
+        status: 'completed',
+        command: 'npm run build'
+      }
+    ]
+  };
+  const step = item.items[0];
+
+  assert.equal(activityMetaShouldOpen(item), false);
+  assert.equal(activityStepDetailShouldOpen(step), false);
+  assert.equal(activityMetaShouldOpen(item, { forceOpen: true }), true);
+  assert.equal(activityStepDetailShouldOpen(step, { forceOpen: true }), false);
+  assert.equal(activityStepDetailShouldOpen({ ...step, status: 'running' }), false);
 });

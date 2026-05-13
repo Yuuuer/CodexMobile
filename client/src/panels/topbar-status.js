@@ -31,30 +31,84 @@ function isHeadlessRuntime(runtime) {
   return source === 'headless-local' || source === 'background' || source === 'local';
 }
 
+function runtimeClassName(runtime, stateClass = 'is-running') {
+  const sourceClass = isDesktopRuntime(runtime)
+    ? 'is-thread-ipc'
+    : isHeadlessRuntime(runtime)
+      ? 'is-headless'
+      : 'is-route-pending';
+  return `is-connected ${stateClass} ${sourceClass}`;
+}
+
+function runtimeDescription(runtime, fallback) {
+  const detail = String(runtime?.detail || '').trim();
+  if (detail) {
+    return detail;
+  }
+  if (isDesktopRuntime(runtime)) {
+    return '当前线程来自桌面端 live mirror，移动端只同步桌面运行过程。';
+  }
+  if (isHeadlessRuntime(runtime)) {
+    return '当前线程正在后台 Codex 执行，桌面端没有接管这个运行。';
+  }
+  return fallback;
+}
+
+function runtimeChannelLabel(runtime, status) {
+  if (status === 'queued') {
+    if (isDesktopRuntime(runtime)) {
+      return '桌面端排队中';
+    }
+    if (isHeadlessRuntime(runtime)) {
+      return '后台排队中';
+    }
+    return '任务排队中';
+  }
+  if (status === 'failed') {
+    if (isDesktopRuntime(runtime)) {
+      return '桌面端运行失败';
+    }
+    if (isHeadlessRuntime(runtime)) {
+      return '后台 Codex 运行失败';
+    }
+    return '运行失败';
+  }
+  if (isDesktopRuntime(runtime)) {
+    return '桌面端运行中';
+  }
+  if (isHeadlessRuntime(runtime)) {
+    return '正在后台运行 Codex';
+  }
+  return '正在运行 Codex';
+}
+
 export function bridgeConnectionLabel(connectionState, desktopBridge, { selectedSession = null, selectedRuntime = null } = {}) {
   if (connectionState !== 'connected') {
     return CONNECTION_STATUS[connectionState] || CONNECTION_STATUS.disconnected;
   }
 
-  if (selectedRuntime?.status === 'running') {
-    if (isDesktopRuntime(selectedRuntime)) {
-      return {
-        label: '正在运行',
-        className: 'is-connected is-running is-thread-ipc',
-        description: '当前线程来自桌面端 live mirror，移动端只同步桌面运行过程。'
-      };
-    }
-    if (isHeadlessRuntime(selectedRuntime)) {
-      return {
-        label: '正在运行',
-        className: 'is-connected is-running is-headless',
-        description: '当前线程正在后台 Codex 执行，桌面端没有接管这个运行。'
-      };
-    }
+  const runtimeStatus = String(selectedRuntime?.status || '').toLowerCase();
+  if (runtimeStatus === 'queued') {
     return {
-      label: '正在运行',
-      className: 'is-connected is-running is-route-pending',
-      description: '当前线程正在运行，正在等待 sync runtime 标明来源。'
+      label: runtimeChannelLabel(selectedRuntime, 'queued'),
+      className: runtimeClassName(selectedRuntime),
+      description: runtimeDescription(selectedRuntime, '当前线程已排队，正在等待开始执行。')
+    };
+  }
+
+  if (runtimeStatus === 'running') {
+    return {
+      label: runtimeChannelLabel(selectedRuntime, 'running'),
+      className: runtimeClassName(selectedRuntime),
+      description: runtimeDescription(selectedRuntime, '当前线程正在运行，正在等待 sync runtime 标明来源。')
+    };
+  }
+
+  if (runtimeStatus === 'failed') {
+    return {
+      label: runtimeChannelLabel(selectedRuntime, 'failed'),
+      className: runtimeClassName(selectedRuntime, 'is-failed'),
+      description: selectedRuntime?.detail || '当前线程任务失败，请查看消息详情。'
     };
   }
 

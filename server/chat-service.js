@@ -7,7 +7,7 @@
  * - createChatService — 创建可注入依赖的聊天服务实例。
  * - normalizeSelectedSkills — 再导出自 chat-request-prep。
  *
- * Inward（本模块依赖/组装的关键符号）: chat-queue、chat-delivery（headless）、chat-request-prep、chat-image-handler、runtime-debug。
+ * Inward（本模块依赖/组装的关键符号）: chat-queue、chat-delivery（headless）、chat-request-prep、chat-image-handler、desktop-ipc、runtime-debug。
  *
  * Outward（谁在用/调用场景）: HTTP 聊天路由或上层服务装配。
  *
@@ -38,6 +38,7 @@ import {
   compactActiveRuns,
   runtimeDebugLine
 } from './runtime-debug.js';
+import { compactDesktopFollowerThread } from './desktop-ipc-client.js';
 
 export { normalizeSelectedSkills } from './chat-request-prep.js';
 
@@ -74,6 +75,7 @@ export function createChatService({
   isImageRequest,
   useLegacyImageGenerator,
   maybeAutoNameSession,
+  compactCodexThread = compactDesktopFollowerThread,
   registerProjectlessThread = registerProjectlessThreadInCodexState,
   registerMobileSession = registerMobileSessionInIndex,
   rememberLiveSession = () => null,
@@ -606,8 +608,96 @@ export function createChatService({
     return true;
   }
 
+  async function compactChat(body = {}, { remoteAddress = '' } = {}) {
+    const project = getProject(body.projectId);
+    if (!project) {
+      const error = new Error('Project not found');
+      error.statusCode = 404;
+      throw error;
+    }
+    const sessionId = String(body.sessionId || body.conversationId || '').trim();
+    if (!sessionId || sessionId.startsWith('draft-')) {
+      const error = new Error('请选择已有桌面线程后再压缩上下文。');
+      error.statusCode = 409;
+      throw error;
+    }
+    runtimeDebugLine('compactChat.enter', {
+      remoteAddress,
+      projectId: project.id,
+      sessionId
+    });
+    const messageId = String(body.clientActionId || '').trim() || `manual-context-compaction-${sessionId}-${Date.now()}`;
+    const startedAt = new Date().toISOString();
+    broadcast({
+      type: 'activity-update',
+      projectId: project.id,
+      sessionId,
+      messageId,
+      kind: 'context_compaction',
+      label: '正在压缩上下文',
+      status: 'running',
+      detail: '',
+      startedAt,
+      timestamp: startedAt
+    });
+    let result;
+    try {
+      result = await compactCodexThread(sessionId, { timeoutMs: 30_000 });
+    } catch (error) {
+      const failedAt = new Date().toISOString();
+      broadcast({
+        type: 'activity-update',
+        projectId: project.id,
+        sessionId,
+        messageId,
+        kind: 'context_compaction',
+        label: '上下文压缩失败',
+        status: 'failed',
+        detail: error.message || '桌面端没有完成上下文压缩。',
+        startedAt,
+        completedAt: failedAt,
+        timestamp: failedAt
+      });
+      throw error;
+    }
+    const timestamp = new Date().toISOString();
+    broadcast({
+      type: 'activity-update',
+      projectId: project.id,
+      sessionId,
+      messageId,
+      kind: 'context_compaction',
+      label: '上下文已压缩',
+      status: 'completed',
+      detail: '',
+      startedAt,
+      completedAt: timestamp,
+      timestamp
+    });
+    broadcast({
+      type: 'context-status-update',
+      projectId: project.id,
+      sessionId,
+      autoCompact: {
+        detected: true,
+        status: 'detected',
+        lastCompactedAt: timestamp,
+        reason: '手动压缩上下文'
+      },
+      updatedAt: timestamp,
+      timestamp
+    });
+    runtimeDebugLine('compactChat.exit', {
+      projectId: project.id,
+      sessionId,
+      result: Boolean(result)
+    });
+    return { accepted: true, sessionId, result: result || null };
+  }
+
   return {
     abortChat,
+    compactChat,
     getActiveImageRuns: chatImage.getActiveImageRuns,
     getTurn(turnId) {
       return chatQueue.getTurn(turnId);

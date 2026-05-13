@@ -7,6 +7,7 @@
  * - desktopIpcMethodVersion / desktopIpcSocketPath / getDesktopIpcSocketStatus。
  * - DesktopIpcClient — 连接与请求封装。
  * - probeDesktopIpc — 探测桌面端 IPC 是否可连。
+ * - compactDesktopFollowerThread — 请求桌面端压缩指定线程上下文。
  * - setDesktopFollowerModelAndReasoning — 同步桌面端当前线程模型设置。
  * - broadcastDesktopThreadListRefresh — 通知 Codex Desktop 刷新线程列表相关查询。
  *
@@ -273,10 +274,13 @@ export async function probeDesktopIpc({ timeoutMs = 3000 } = {}) {
 }
 
 async function requestDesktopFollower(method, params, options = {}) {
-  const client = new DesktopIpcClient();
+  const { socketPath = null, ...requestOptions } = options;
+  const client = new DesktopIpcClient({
+    ...(socketPath ? { socketPath } : {})
+  });
   try {
     await client.connect({ timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS });
-    const response = await client.request(method, params, options);
+    const response = await client.request(method, params, requestOptions);
     if (response.resultType === 'error') {
       const error = ipcError(response.error || `桌面端 Codex 拒绝请求: ${method}`);
       error.statusCode = response.error === 'no-client-found' ? 409 : 502;
@@ -286,6 +290,12 @@ async function requestDesktopFollower(method, params, options = {}) {
   } finally {
     client.close();
   }
+}
+
+export async function compactDesktopFollowerThread(conversationId, options = {}) {
+  return requestDesktopFollower('thread-follower-compact-thread', {
+    conversationId
+  }, options);
 }
 
 export async function setDesktopFollowerModelAndReasoning(conversationId, model, reasoningEffort, options = {}) {

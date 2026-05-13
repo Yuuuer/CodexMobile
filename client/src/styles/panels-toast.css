@@ -81,6 +81,89 @@
   background: transparent;
 }
 
+.pwa-update-prompt {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--keyboard-inset, 0px) + var(--composer-height, 74px) + env(safe-area-inset-bottom, 0px) + 10px);
+  z-index: 88;
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto 28px;
+  align-items: center;
+  gap: 9px;
+  min-height: 50px;
+  padding: 8px 8px 8px 11px;
+  border: 1px solid rgba(16, 163, 127, 0.28);
+  border-radius: 14px;
+  color: var(--text);
+  background: var(--glass-strong);
+  box-shadow: var(--soft-shadow);
+  backdrop-filter: blur(20px) saturate(1.14);
+}
+
+.pwa-update-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.12);
+}
+
+.pwa-update-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.pwa-update-copy strong,
+.pwa-update-copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pwa-update-copy strong {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.pwa-update-copy small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.pwa-update-refresh,
+.pwa-update-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+}
+
+.pwa-update-refresh {
+  gap: 5px;
+  padding: 0 10px;
+  color: #ffffff;
+  background: var(--accent);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.pwa-update-dismiss {
+  width: 28px;
+  color: var(--muted);
+  background: transparent;
+}
+
+[data-theme="dark"] .pwa-update-prompt {
+  border-color: rgba(52, 211, 153, 0.24);
+  background: rgba(16, 185, 129, 0.16);
+}
+
 .connection-recovery-card {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 62px);

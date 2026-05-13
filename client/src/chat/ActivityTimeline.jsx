@@ -1,5 +1,5 @@
 /**
- * 渲染活动任务时间线：文本/实时态/分隔/子代理等节点。
+ * 渲染活动任务时间线：按桌面端节奏保留“输出片段 -> 工具过程”的交替片段。
  *
  * Keywords: activity timeline, lucide, markdown
  *
@@ -13,27 +13,56 @@
 
 import { BookOpenCheck, Bot, FileText, Pencil, Search, SquareTerminal } from 'lucide-react';
 import {
+  activityTimelineSegments,
   activityBodyItemsForDisplay,
   activityDetailText,
+  activityMetaShouldOpen,
   activityStepDetailTitle,
+  activityStepDetailShouldOpen,
   isSkillActivityStep
 } from './activity-timeline-model.js';
 import { MarkdownContent } from './MarkdownContent.jsx';
 
-export function ActivityTimeline({ timeline }) {
+export function ActivityTimeline({ timeline, detailsOpen = false }) {
   if (!timeline?.length) {
     return null;
   }
+  const segments = activityTimelineSegments(timeline);
   return (
     <div className="activity-timeline" aria-label="任务进度">
-      {(timeline || []).map((item) => (
-        <ActivityTimelineItem key={item.id} item={item} />
+      {segments.map((segment) => (
+        <ActivityTimelineSegment key={segment.id} segment={segment} detailsOpen={detailsOpen} />
       ))}
     </div>
   );
 }
 
-function ActivityTimelineItem({ item }) {
+function ActivityTimelineSegment({ segment, detailsOpen = false }) {
+  if (segment.type === 'standalone') {
+    return <ActivityTimelineItem item={segment.item} detailsOpen={detailsOpen} />;
+  }
+  const hasText = Boolean(segment.textItem);
+  const hasTools = Boolean(segment.items?.length);
+  return (
+    <section className={`activity-segment ${hasText ? 'has-text' : ''} ${hasTools ? 'has-tools' : ''}`}>
+      <span className="activity-segment-node" aria-hidden="true" />
+      {hasText ? (
+        <div className="activity-segment-text">
+          <ActivityTimelineItem item={segment.textItem} detailsOpen={detailsOpen} />
+        </div>
+      ) : null}
+      {hasTools ? (
+        <div className="activity-segment-tools">
+          {segment.items.map((item) => (
+            <ActivityTimelineItem key={item.id} item={item} detailsOpen={detailsOpen} />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function ActivityTimelineItem({ item, detailsOpen = false }) {
   if (item.type === 'text') {
     return (
       <MarkdownContent
@@ -58,17 +87,18 @@ function ActivityTimelineItem({ item }) {
     );
   }
   if (item.metaType === 'subagent') {
-    return <SubagentActivityBlock item={item} />;
+    return <SubagentActivityBlock item={item} detailsOpen={detailsOpen} />;
   }
-  return <MetaActivityBlock item={item} />;
+  return <MetaActivityBlock item={item} detailsOpen={detailsOpen} />;
 }
 
-function MetaActivityBlock({ item }) {
+function MetaActivityBlock({ item, detailsOpen = false }) {
   const visibleItems = item.type === 'metaBurst' ? item.visibleItems || [] : item.items || [];
   const overflowItems = item.type === 'metaBurst' ? item.overflowItems || [] : [];
   const allItems = item.items || visibleItems;
   const running = allItems.some((step) => step.status === 'running' || step.status === 'queued');
   const { visibleBodyItems, overflowBodyItems } = activityBodyItemsForDisplay(visibleItems, overflowItems);
+  const shouldOpen = activityMetaShouldOpen(item, { forceOpen: detailsOpen });
 
   if (!visibleBodyItems.length && !overflowBodyItems.length) {
     return (
@@ -82,21 +112,21 @@ function MetaActivityBlock({ item }) {
   }
 
   return (
-    <details className={`activity-meta ${running ? 'is-running' : ''}`} open={running}>
+    <details className={`activity-meta ${running ? 'is-running' : ''}`} open={shouldOpen}>
       <summary className="activity-meta-summary">
         {activityMetaIcon(item)}
         <span>{item.title}</span>
       </summary>
       <div className="activity-meta-body">
         {visibleBodyItems.map((step) => (
-          <ActivityStepDetail key={step.id} step={step} />
+          <ActivityStepDetail key={step.id} step={step} detailsOpen={detailsOpen} />
         ))}
         {overflowBodyItems.length ? (
-          <details className="activity-overflow">
+          <details className="activity-overflow" open={detailsOpen}>
             <summary>还有 {overflowBodyItems.length} 条过程</summary>
             <div className="activity-meta-body">
               {overflowBodyItems.map((step) => (
-                <ActivityStepDetail key={step.id} step={step} />
+                <ActivityStepDetail key={step.id} step={step} detailsOpen={detailsOpen} />
               ))}
             </div>
           </details>
@@ -106,7 +136,7 @@ function MetaActivityBlock({ item }) {
   );
 }
 
-function ActivityStepDetail({ step }) {
+function ActivityStepDetail({ step, detailsOpen = false }) {
   const detail = activityDetailText(step);
   const isCommand = step.type === 'command' || Boolean(step.command);
   if (isCommand) {
@@ -124,7 +154,10 @@ function ActivityStepDetail({ step }) {
           ? '运行中'
           : '成功';
     return (
-      <details className={`activity-command-detail ${failed ? 'is-failed' : ''}`} open={running}>
+      <details
+        className={`activity-command-detail ${failed ? 'is-failed' : ''}`}
+        open={activityStepDetailShouldOpen(step, { forceOpen: detailsOpen })}
+      >
         <summary>
           {activityStepIcon(step)}
           <span>{title}</span>
@@ -152,13 +185,13 @@ function ActivityStepDetail({ step }) {
   );
 }
 
-function SubagentActivityBlock({ item }) {
+function SubagentActivityBlock({ item, detailsOpen = false }) {
   const items = item.items || [];
   const agents = items.flatMap((step) => (Array.isArray(step.subAgents) ? step.subAgents : []));
   const title = items[0]?.label || item.title || `${agents.length || 1} 个后台智能体（使用 @ 标记智能体）`;
   const running = items.some((step) => step.status === 'running' || step.status === 'queued');
   return (
-    <details className="activity-meta activity-subagents" open={running}>
+    <details className="activity-meta activity-subagents" open={running || detailsOpen}>
       <summary className="activity-meta-summary">
         <Bot size={13} />
         <span>{title}</span>

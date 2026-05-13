@@ -498,13 +498,11 @@ function describeComposerActivityStep(step) {
   return { type: 'tool', label: compactComposerActivityText(label || '调用工具') };
 }
 
-export function buildComposerRunStatus(messages, running, now = Date.now()) {
+export function buildComposerRunStatus(messages, running, now = Date.now(), { runtimeStartedAt = null } = {}) {
   if (!running) {
     return null;
   }
-  const activity = [...(messages || [])]
-    .reverse()
-    .find((message) => message.role === 'activity' && (message.status === 'running' || message.status === 'queued'));
+  const activity = latestComposerActivityForRuntime(messages, { runtimeStartedAt });
 
   const steps = Array.isArray(activity?.activities) ? activity.activities : [];
   const visibleSteps = steps.filter((step) => isVisibleComposerActivityStep(step, activity?.status || 'running'));
@@ -542,6 +540,48 @@ export function buildComposerRunStatus(messages, running, now = Date.now()) {
     duration,
     running: true
   };
+}
+
+function latestComposerActivityForRuntime(messages = [], { runtimeStartedAt = null } = {}) {
+  const activities = [...(messages || [])].reverse().filter((message) => message?.role === 'activity');
+  return (
+    activities.find((message) =>
+      (message.status === 'running' || message.status === 'queued') &&
+      composerActivityTouchesRuntimeWindow(message, runtimeStartedAt)
+    ) ||
+    activities.find((message) => {
+      if (!composerActivityTouchesRuntimeWindow(message, runtimeStartedAt)) {
+        return false;
+      }
+      const steps = Array.isArray(message.activities) ? message.activities : [];
+      return steps.some((step) => isVisibleComposerActivityStep(step, message.status || 'running'));
+    }) ||
+    null
+  );
+}
+
+function composerActivityTouchesRuntimeWindow(message, runtimeStartedAt) {
+  const runtimeStartMs = runtimeStartedAt ? new Date(runtimeStartedAt).getTime() : NaN;
+  if (!Number.isFinite(runtimeStartMs)) {
+    return true;
+  }
+  const values = [
+    message?.timestamp,
+    message?.startedAt,
+    message?.completedAt,
+    ...(Array.isArray(message?.activities)
+      ? message.activities.flatMap((activity) => [
+        activity?.timestamp,
+        activity?.startedAt,
+        activity?.completedAt
+      ])
+      : [])
+  ];
+  const latestMs = values.reduce((latest, value) => {
+    const time = value ? new Date(value).getTime() : NaN;
+    return Number.isFinite(time) && time > latest ? time : latest;
+  }, Number.NEGATIVE_INFINITY);
+  return Number.isFinite(latestMs) && latestMs >= runtimeStartMs - 1000;
 }
 
 export function hasVisibleAssistantForTurn(messages, payload) {
