@@ -14,6 +14,7 @@ import {
   dismissPlanImplementationPrompts,
   isPlaceholderActivityMessage,
   isVisibleActivityStep,
+  removeStalePlanRequestsAfterUserMessages,
   shouldRenderActivityMessageInChat,
   upsertActivityMessage,
   upsertAssistantMessage,
@@ -218,7 +219,7 @@ test('real activity still renders in the chat stream', () => {
   }), true);
 });
 
-test('plan implementation activity is visible and preserves confirmation payload', () => {
+test('plan implementation activity is hidden because plan requests render as standalone cards', () => {
   const step = activityStepFromPayload({
     sessionId: 'thread-1',
     turnId: 'turn-1',
@@ -235,7 +236,7 @@ test('plan implementation activity is visible and preserves confirmation payload
     }
   });
 
-  assert.equal(isVisibleActivityStep(step, 'completed'), true);
+  assert.equal(isVisibleActivityStep(step, 'completed'), false);
   assert.deepEqual(step.planImplementation, {
     requestId: 'implement-plan:turn-1',
     turnId: 'turn-1',
@@ -259,6 +260,91 @@ test('upsertAssistantMessage renders proposed plans as standalone plan messages'
   assert.deepEqual(result[1].planImplementation, {
     requestId: 'implement-plan:turn-1',
     turnId: 'turn-1',
+    planContent: '# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。',
+    completed: false
+  });
+});
+
+test('upsertActivityMessage promotes streamed proposed plans out of the activity card', () => {
+  const result = upsertActivityMessage([
+    {
+      id: 'status-turn-1',
+      role: 'activity',
+      sessionId: 'thread-1',
+      turnId: 'turn-1',
+      status: 'running',
+      activities: [{ id: 'browser-1', kind: 'browser', label: '已操作浏览器', status: 'completed' }]
+    }
+  ], {
+    sessionId: 'thread-1',
+    turnId: 'turn-1',
+    messageId: 'assistant-plan-1',
+    kind: 'agent_message',
+    status: 'completed',
+    label: '<proposed_plan>\n# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。\n</proposed_plan>'
+  });
+
+  assert.deepEqual(result.map((message) => message.role), ['plan', 'plan_request']);
+  assert.equal(result[0].content, '# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。');
+  assert.equal(result[1].planImplementation.requestId, 'implement-plan:turn-1');
+});
+
+test('upsertActivityMessage promotes proposed plans from tool output out of the activity card', () => {
+  const result = upsertActivityMessage([
+    {
+      id: 'status-turn-1',
+      role: 'activity',
+      sessionId: 'thread-1',
+      turnId: 'turn-1',
+      status: 'running',
+      activities: [{ id: 'browser-1', kind: 'dynamic_tool_call', label: '操作浏览器', status: 'completed' }]
+    }
+  ], {
+    sessionId: 'thread-1',
+    turnId: 'turn-1',
+    messageId: 'browser-1',
+    kind: 'dynamic_tool_call',
+    status: 'completed',
+    label: '已操作浏览器',
+    output: '<proposed_plan>\n# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。\n</proposed_plan>'
+  });
+
+  assert.deepEqual(result.map((message) => message.role), ['plan', 'plan_request']);
+  assert.equal(result[0].content, '# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。');
+  assert.equal(result[1].planImplementation.planContent, '# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。');
+});
+
+test('upsertActivityMessage promotes plan implementation requests out of the activity card', () => {
+  const result = upsertActivityMessage([
+    {
+      id: 'status-turn-1',
+      role: 'activity',
+      sessionId: 'thread-1',
+      turnId: 'turn-1',
+      status: 'running',
+      activities: [{ id: 'thinking', kind: 'reasoning', label: '正在思考', status: 'running' }]
+    }
+  ], {
+    sessionId: 'thread-1',
+    turnId: 'turn-1',
+    messageId: 'implement-plan:app-turn-1',
+    kind: 'plan_implementation',
+    status: 'running',
+    label: '等待确认执行计划',
+    detail: '# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。',
+    planImplementation: {
+      requestId: 'implement-plan:app-turn-1',
+      turnId: 'app-turn-1',
+      planContent: '# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。',
+      completed: false
+    }
+  });
+
+  assert.deepEqual(result.map((message) => message.role), ['plan', 'plan_request']);
+  assert.equal(result[0].id, 'implement-plan:app-turn-1-plan');
+  assert.deepEqual(result[1].planImplementation, {
+    requestId: 'implement-plan:app-turn-1',
+    turnId: 'app-turn-1',
     planContent: '# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。',
     completed: false
   });
@@ -311,4 +397,26 @@ test('dismissPlanImplementationPrompts removes the plan request after a choice i
   assert.equal(result[1].activities[0].planImplementation.completed, true);
   assert.equal(isVisibleActivityStep(result[1].activities[0], result[1].status), false);
   assert.equal(shouldRenderActivityMessageInChat(result[1]), false);
+});
+
+test('removeStalePlanRequestsAfterUserMessages hides expired plan confirmations', () => {
+  const result = removeStalePlanRequestsAfterUserMessages([
+    { id: 'plan-1', role: 'plan', content: '1. 定位同步链路' },
+    {
+      id: 'request-1',
+      role: 'plan_request',
+      content: '实施此计划?',
+      planImplementation: { requestId: 'implement-plan:turn-1', planContent: '1. 定位同步链路' }
+    },
+    { id: 'user-2', role: 'user', content: '修改这个问题' },
+    { id: 'plan-2', role: 'plan', content: '2. 新计划' },
+    {
+      id: 'request-2',
+      role: 'plan_request',
+      content: '实施此计划?',
+      planImplementation: { requestId: 'implement-plan:turn-2', planContent: '2. 新计划' }
+    }
+  ]);
+
+  assert.deepEqual(result.map((message) => message.id), ['plan-1', 'user-2', 'plan-2', 'request-2']);
 });

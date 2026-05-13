@@ -64,21 +64,38 @@ function planMessageFromPayload(payload, planContent) {
 function planRequestMessageFromPayload(payload, planContent) {
   const baseId = payload.messageId || `assistant-${payload.turnId || Date.now()}`;
   const turnId = payload.turnId || null;
+  const implementation = payload.planImplementation || {};
+  const requestTurnId = String(implementation.turnId || turnId || '').trim();
+  const completed = Boolean(implementation.completed || payload.status === 'completed' && payload.kind === 'plan_implementation');
   return {
     id: `${baseId}-plan-request`,
     role: 'plan_request',
-    content: '实施此计划?',
-    status: 'running',
+    content: completed ? '计划已确认执行' : '实施此计划?',
+    status: completed ? 'completed' : 'running',
     timestamp: payload.timestamp || new Date().toISOString(),
-    turnId,
+    turnId: requestTurnId || turnId,
     sessionId: payload.sessionId || null,
     planImplementation: {
-      requestId: turnId ? `implement-plan:${turnId}` : '',
-      turnId,
+      requestId: String(implementation.requestId || (requestTurnId ? `implement-plan:${requestTurnId}` : '')).trim(),
+      turnId: requestTurnId || turnId,
       planContent,
-      completed: false
+      completed
     }
   };
+}
+
+function planContentFromActivityPayload(payload) {
+  const implementationPlan = String(payload?.planImplementation?.planContent || '').trim();
+  if (implementationPlan && (payload.kind === 'plan_implementation' || payload.kind === 'plan-implementation')) {
+    return implementationPlan;
+  }
+  return extractProposedPlanContent([
+    payload?.content,
+    payload?.label,
+    payload?.detail,
+    payload?.output,
+    payload?.error
+  ].map(activityPayloadText).filter(Boolean).join('\n'));
 }
 
 function normalizedPlanText(value) {
@@ -139,6 +156,15 @@ export function dismissPlanImplementationPrompts(current, planImplementation) {
       return changed ? { ...message, activities } : message;
     })
     .filter(Boolean);
+}
+
+export function removeStalePlanRequestsAfterUserMessages(current = []) {
+  return current.filter((message, index) => {
+    if (message?.role !== 'plan_request') {
+      return true;
+    }
+    return !current.slice(index + 1).some((nextMessage) => nextMessage?.role === 'user');
+  });
 }
 
 function upsertMessageById(current, message) {
@@ -471,7 +497,7 @@ export function isVisibleActivityStep(step, messageStatus) {
   if (!step) {
     return false;
   }
-  if (step.kind === 'plan_implementation' && step.planImplementation?.completed) {
+  if (step.kind === 'plan_implementation' || step.kind === 'plan-implementation') {
     return false;
   }
   if (isThinkingActivityStep(step)) {
@@ -691,6 +717,14 @@ export function upsertStatusMessage(current, payload) {
 }
 
 export function upsertActivityMessage(current, payload) {
+  const proposedPlan = planContentFromActivityPayload(payload);
+  if (proposedPlan) {
+    const withoutCurrentActivity = removeActivityMessagesForTurn(current, payload);
+    return upsertMessageById(
+      upsertMessageById(withoutCurrentActivity, planMessageFromPayload(payload, proposedPlan)),
+      planRequestMessageFromPayload(payload, proposedPlan)
+    );
+  }
   const id = statusMessageId(payload);
   const existingIndex = current.findIndex((message) => message.id === id);
   const previous = existingIndex >= 0 ? current[existingIndex] : null;

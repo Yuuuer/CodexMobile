@@ -1,5 +1,5 @@
 /**
- * 根据运行态与是否有可展示进度，决定活动卡片是否默认展开。
+ * 根据运行态、文件变更与可展示进度，决定活动卡片是否默认展开。
  *
  * Keywords: activity card, expand, running
  *
@@ -28,7 +28,7 @@ export function effectiveActivityMessageIsRunning({ message = {}, activities = m
   return Boolean(forceRunning || activityMessageIsRunning(message, activities));
 }
 
-export function activityCardShouldOpen({ running, hasProcess, message, activities } = {}) {
+export function activityCardShouldOpen({ running, hasProcess, hasFileSummary = false, message, activities } = {}) {
   const active = running ?? activityMessageIsRunning(message, activities);
-  return Boolean(active && hasProcess);
+  return Boolean(hasProcess && (active || hasFileSummary));
 }

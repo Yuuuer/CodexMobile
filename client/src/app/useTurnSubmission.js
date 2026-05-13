@@ -16,6 +16,7 @@ import { contentWithAttachmentPreviews } from '../chat/MarkdownContent.jsx';
 import { serviceTierForModelSpeed } from '../composer/composer-options.js';
 import {
   dismissPlanImplementationPrompts,
+  removeStalePlanRequestsAfterUserMessages,
   upsertStatusMessage
 } from '../chat/activity-model.js';
 import {
@@ -80,7 +81,8 @@ export function useTurnSubmission({
     sendMode = 'start',
     collaborationMode = null,
     visibleMessageOverride = null,
-    codexMessageOverride = null
+    codexMessageOverride = null,
+    planImplementation = null
   }) {
     const project = projectForTurnSelection(selectedProject, selectedProjectRef, selectedSession, selectedSessionRef, projects);
     const selectedAttachments = Array.isArray(attachmentsForTurn) ? attachmentsForTurn : [];
@@ -143,7 +145,7 @@ export function useTurnSubmission({
       sessionId: optimisticSessionId,
       turnId
     };
-    setMessages((current) => [...current, localUserMessage]);
+    setMessages((current) => removeStalePlanRequestsAfterUserMessages([...current, localUserMessage]));
     markRun?.({
       source: 'local-optimistic',
       projectId: project.id,
@@ -176,7 +178,8 @@ export function useTurnSubmission({
           attachments: selectedAttachments,
           fileMentions: selectedFileMentions,
           sendMode,
-          collaborationMode
+          collaborationMode,
+          ...(planImplementation ? { planImplementation } : {})
         }
       });
       const resultTurnId = result.turnId || turnId;
@@ -257,7 +260,7 @@ export function useTurnSubmission({
     const prepared = prepareComposerSubmission(input, attachments, fileMentions, collaborationMode);
     const project = projectForTurnSelection(selectedProject, selectedProjectRef, selectedSession, selectedSessionRef, projects);
     if ((!prepared.message && !attachments.length && !fileMentions.length) || !project) {
-      return;
+      return false;
     }
     try {
       await submitCodexMessage({
@@ -269,8 +272,10 @@ export function useTurnSubmission({
         collaborationMode: prepared.collaborationMode
       });
       await loadQueueDrafts(selectedSessionRef.current);
+      return true;
     } catch {
       // submitCodexMessage already reflects the failure in the chat UI.
+      return false;
     }
   }
 
@@ -291,7 +296,8 @@ export function useTurnSubmission({
         codexMessageOverride: prompt,
         clearComposer: false,
         sendMode: 'start',
-        collaborationMode: 'default'
+        collaborationMode: 'default',
+        planImplementation
       });
       const requestId = String(planImplementation?.requestId || '').trim();
       const requestTurnId = String(planImplementation?.turnId || '').trim();

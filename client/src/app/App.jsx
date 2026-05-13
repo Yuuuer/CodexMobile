@@ -621,10 +621,10 @@ export default function App() {
   });
   const topBarRuntime = selectedRuntime || (selectedRunning ? { status: 'running' } : null);
 
-  const handleComposerSubmit = useCallback((options = {}) => {
+  const handleComposerSubmit = useCallback(async (options = {}) => {
     const collaborationMode = options.collaborationMode || selectedCollaborationMode || null;
-    handleSubmit({ ...options, collaborationMode });
-    if (collaborationMode) {
+    const accepted = await handleSubmit({ ...options, collaborationMode });
+    if (accepted && collaborationMode) {
       setSelectedCollaborationMode(null);
     }
   }, [handleSubmit, selectedCollaborationMode]);
@@ -709,6 +709,7 @@ export default function App() {
     theme,
     setTheme,
     runtimeDebug: status.runtimeDebug,
+    desktopRefresh: status.desktopRefresh,
     refreshStatus: loadStatus
   };
   const chatProps = {

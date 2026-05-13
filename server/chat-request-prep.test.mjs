@@ -96,6 +96,27 @@ test('prepareChatRequest ignores unsupported service tier values', () => {
   assert.equal(prepared.serviceTierForTurn, null);
 });
 
+test('prepareChatRequest normalizes default collaboration mode with runtime settings', () => {
+  const prepared = prepareChatRequest({
+    message: 'Implement plan.',
+    collaborationMode: 'default',
+    model: 'gpt-5.5',
+    reasoningEffort: 'high'
+  }, {
+    getSession: () => null,
+    config: {}
+  });
+
+  assert.deepEqual(prepared.collaborationMode, {
+    mode: 'default',
+    settings: {
+      model: 'gpt-5.5',
+      reasoning_effort: 'high',
+      developer_instructions: null
+    }
+  });
+});
+
 test('prepareChatRequest keeps drafts separate and preserves mobile-only requested session ids', () => {
   const draft = prepareChatRequest({
     draftSessionId: 'draft-project-1-1',

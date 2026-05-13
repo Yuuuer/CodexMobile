@@ -1,7 +1,7 @@
 /**
  * 应用初始状态快照：连接与桌面桥、默认模型与推理档位、文档集成占位、上下文窗口占位等常量对象。
  *
- * Keywords: default-status, initial-state, reasoning-effort
+ * Keywords: default-status, initial-state, reasoning-effort, desktop-refresh
  *
  * Exports:
  * - `DEFAULT_STATUS` — 完整默认 `status` 形状。
@@ -69,6 +69,14 @@ export const DEFAULT_STATUS = {
     uiEnabled: false,
     enabled: false,
     logRelativePath: '.codexmobile/logs/runtime-debug.jsonl'
+  },
+  desktopRefresh: {
+    enabled: false,
+    supported: false,
+    experimental: true,
+    mode: 'completion',
+    lastTriggeredAt: null,
+    lastError: null
   }
 };
 

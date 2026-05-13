@@ -555,6 +555,131 @@ test('messagesFromDesktopThread removes stale plan request after implementation 
   assert.equal(messages[2].content, '执行计划');
 });
 
+test('messagesFromDesktopThread removes stale plan request after minimal implementation prompt', () => {
+  const planContent = '# 修复计划\n\n## Summary\n处理移动端计划 UI。';
+  const messages = messagesFromDesktopThread({
+    id: 'thread-1',
+    turns: [
+      {
+        id: 'turn-1',
+        status: 'completed',
+        startedAt: 1770000000,
+        completedAt: 1770000003,
+        items: [
+          { id: 'user-1', type: 'userMessage', content: [{ type: 'text', text: '/plan 修复同步问题' }] },
+          {
+            id: 'answer-1',
+            type: 'agentMessage',
+            phase: 'final_answer',
+            text: `<proposed_plan>\n${planContent}\n</proposed_plan>`
+          }
+        ]
+      },
+      {
+        id: 'turn-2',
+        status: 'running',
+        startedAt: 1770000005,
+        items: [
+          {
+            id: 'user-2',
+            type: 'userMessage',
+            content: [{ type: 'text', text: 'Implement plan.' }]
+          }
+        ]
+      }
+    ]
+  }, { includeActivity: true });
+
+  assert.deepEqual(messages.map((message) => message.role), ['user', 'plan', 'user']);
+  assert.equal(messages[1].content, planContent);
+  assert.equal(messages[2].content, '执行计划');
+});
+
+test('messagesFromDesktopThread keeps future plan requests after an earlier minimal implementation prompt', () => {
+  const firstPlan = '# 第一份计划\n\n## Summary\n旧计划。';
+  const secondPlan = '# 第二份计划\n\n## Summary\n新计划。';
+  const messages = messagesFromDesktopThread({
+    id: 'thread-1',
+    turns: [
+      {
+        id: 'turn-1',
+        status: 'completed',
+        startedAt: 1770000000,
+        completedAt: 1770000003,
+        items: [
+          {
+            id: 'answer-1',
+            type: 'agentMessage',
+            phase: 'final_answer',
+            text: `<proposed_plan>\n${firstPlan}\n</proposed_plan>`
+          }
+        ]
+      },
+      {
+        id: 'turn-2',
+        status: 'completed',
+        startedAt: 1770000005,
+        completedAt: 1770000006,
+        items: [
+          { id: 'user-2', type: 'userMessage', content: [{ type: 'text', text: 'Implement plan.' }] }
+        ]
+      },
+      {
+        id: 'turn-3',
+        status: 'completed',
+        startedAt: 1770000010,
+        completedAt: 1770000012,
+        items: [
+          {
+            id: 'answer-3',
+            type: 'agentMessage',
+            phase: 'final_answer',
+            text: `<proposed_plan>\n${secondPlan}\n</proposed_plan>`
+          }
+        ]
+      }
+    ]
+  }, { includeActivity: true });
+
+  assert.deepEqual(messages.map((message) => message.role), ['plan', 'user', 'plan', 'plan_request']);
+  assert.equal(messages[2].content, secondPlan);
+  assert.equal(messages[3].planImplementation.planContent, secondPlan);
+});
+
+test('messagesFromDesktopThread hides stale plan request after a later user message', () => {
+  const planContent = '# 修复计划\n\n## Summary\n处理移动端计划 UI。';
+  const messages = messagesFromDesktopThread({
+    id: 'thread-1',
+    turns: [
+      {
+        id: 'turn-1',
+        status: 'completed',
+        startedAt: 1770000000,
+        completedAt: 1770000003,
+        items: [
+          {
+            id: 'answer-1',
+            type: 'agentMessage',
+            phase: 'final_answer',
+            text: `<proposed_plan>\n${planContent}\n</proposed_plan>`
+          }
+        ]
+      },
+      {
+        id: 'turn-2',
+        status: 'completed',
+        startedAt: 1770000005,
+        completedAt: 1770000006,
+        items: [
+          { id: 'user-2', type: 'userMessage', content: [{ type: 'text', text: '修改这个问题' }] }
+        ]
+      }
+    ]
+  }, { includeActivity: true });
+
+  assert.deepEqual(messages.map((message) => message.role), ['plan', 'user']);
+});
+
 test('rawSessionActivitiesFromJsonl restores exec_command events omitted by desktop thread read', () => {
   const content = [
     {

@@ -44,7 +44,6 @@ export function ChatMessage({
         message={message}
         now={now}
         forceRunning={Boolean(activeActivityMessageId && message.id === activeActivityMessageId)}
-        onImplementPlan={onImplementPlan}
       />
     );
   }

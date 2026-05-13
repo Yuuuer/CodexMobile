@@ -24,6 +24,7 @@ import {
 import {
   upsertActivityMessage,
   upsertAssistantMessage,
+  removeStalePlanRequestsAfterUserMessages,
   upsertStatusMessage
 } from '../chat/activity-model.js';
 import { sameUserMessageContent } from '../chat/message-identity.js';
@@ -171,7 +172,7 @@ export function applySyncSocketPayload(payload, context) {
       const exists = current.some((message) =>
         message.role === 'user' && sameUserMessageContent(message.content, event.message.content)
       );
-      return exists ? current : [...current, event.message];
+      return exists ? current : removeStalePlanRequestsAfterUserMessages([...current, event.message]);
     });
     return true;
   }

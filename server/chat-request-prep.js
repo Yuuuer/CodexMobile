@@ -103,20 +103,24 @@ export function normalizeSelectedSkills(value, availableSkills = []) {
 export function normalizeCollaborationMode(value, { model = '', reasoningEffort = null } = {}) {
   const requestedMode = typeof value === 'string' ? value : value?.mode;
   const mode = String(requestedMode || '').trim().toLowerCase();
+  const settings = typeof value === 'object' && value?.settings ? value.settings : {};
+  const normalizedSettings = {
+    model: String(settings.model ?? model ?? '').trim(),
+    reasoning_effort: settings.reasoning_effort ?? settings.reasoningEffort ?? reasoningEffort ?? null,
+    developer_instructions: settings.developer_instructions ?? null
+  };
   if (['default', 'normal', 'none', 'off'].includes(mode)) {
-    return { mode: 'default' };
+    return {
+      mode: 'default',
+      settings: normalizedSettings
+    };
   }
   if (mode !== 'plan') {
     return null;
   }
-  const settings = typeof value === 'object' && value?.settings ? value.settings : {};
   return {
     mode: 'plan',
-    settings: {
-      model: String(settings.model ?? model ?? '').trim(),
-      reasoning_effort: settings.reasoning_effort ?? settings.reasoningEffort ?? reasoningEffort ?? null,
-      developer_instructions: settings.developer_instructions ?? null
-    }
+    settings: normalizedSettings
   };
 }
 

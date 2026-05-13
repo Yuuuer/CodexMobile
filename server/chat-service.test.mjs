@@ -406,6 +406,7 @@ test('headless runner rejection emits a terminal failure and frees the next send
 test('post-run cache refresh does not keep the conversation queue running', async () => {
   let runCount = 0;
   let refreshStarted = false;
+  const routeBounces = [];
   const { service } = makeChatService({
     refreshCodexCache: async () => {
       refreshStarted = true;
@@ -415,6 +416,10 @@ test('post-run cache refresh does not keep the conversation queue running', asyn
       runCount += 1;
       emit({ type: 'chat-complete', sessionId: payload.sessionId, turnId: payload.turnId });
       return payload.sessionId;
+    },
+    triggerDesktopRefreshForThread: async (threadId, options) => {
+      routeBounces.push({ threadId, options });
+      return { triggered: true };
     }
   });
 
@@ -438,6 +443,53 @@ test('post-run cache refresh does not keep the conversation queue running', asyn
   assert.equal(refreshStarted, true);
   assert.equal(second.delivery, 'started');
   assert.equal(runCount, 2);
+  assert.deepEqual(routeBounces, [
+    {
+      threadId: 'thread-1',
+      options: { reason: 'headless-turn-completed' }
+    },
+    {
+      threadId: 'thread-1',
+      options: { reason: 'headless-turn-completed' }
+    }
+  ]);
+});
+
+test('sendChat asks desktop to refresh after an existing headless thread completes', async () => {
+  const routeBounces = [];
+  const { service } = makeChatService({
+    getDesktopBridgeStatus: async () => ({
+      strict: true,
+      connected: true,
+      mode: 'desktop-ipc',
+      reason: null,
+      capabilities: { sendToOpenDesktopThread: true, createThread: false }
+    }),
+    runCodexTurn: async (payload, emit) => {
+      emit({ type: 'chat-complete', sessionId: payload.sessionId, turnId: payload.turnId });
+      return payload.sessionId;
+    },
+    triggerDesktopRefreshForThread: async (threadId, options) => {
+      routeBounces.push({ threadId, options });
+      return { triggered: true };
+    }
+  });
+
+  const result = await service.sendChat({
+    projectId: 'project-1',
+    sessionId: 'thread-1',
+    clientTurnId: 'client-turn-existing-refresh',
+    message: '手机端执行完以后桌面也刷新'
+  });
+  await flushQueuedWork();
+
+  assert.equal(result.delivery, 'started');
+  assert.deepEqual(routeBounces, [
+    {
+      threadId: 'thread-1',
+      options: { reason: 'headless-turn-completed' }
+    }
+  ]);
 });
 
 test('sendChat sends plan requests through headless without desktop collaboration IPC', async () => {
@@ -508,7 +560,7 @@ test('sendChat leaves desktop collaboration mode untouched for normal headless f
   assert.equal(runPayload.collaborationMode, null);
 });
 
-test('sendChat does not call desktop plan-mode IPC before implementing a plan', async () => {
+test('sendChat exits plan mode explicitly before implementing a plan', async () => {
   let runPayload = null;
   const { service } = makeChatService({
     getDesktopBridgeStatus: async () => ({
@@ -528,13 +580,63 @@ test('sendChat does not call desktop plan-mode IPC before implementing a plan', 
   const result = await service.sendChat({
     projectId: 'project-1',
     sessionId: 'thread-1',
-    message: 'PLEASE IMPLEMENT THIS PLAN:\n1. 修复',
-    collaborationMode: 'default'
+    message: 'Implement plan.',
+    collaborationMode: 'default',
+    model: 'gpt-5.5',
+    reasoningEffort: 'high'
   });
 
   assert.equal(result.delivery, 'started');
   assert.equal(result.desktopBridge.mode, 'headless-local');
-  assert.equal(runPayload.collaborationMode, null);
+  assert.deepEqual(runPayload.collaborationMode, {
+    mode: 'default',
+    settings: {
+      model: 'gpt-5.5',
+      reasoning_effort: 'high',
+      developer_instructions: null
+    }
+  });
+});
+
+test('sendChat implements proposed plans through headless with full plan content even when desktop IPC is available', async () => {
+  let runPayload = null;
+  const { service, broadcasts } = makeChatService({
+    getDesktopBridgeStatus: async () => ({
+      strict: true,
+      connected: true,
+      mode: 'desktop-ipc',
+      reason: null,
+      capabilities: {
+        sendToOpenDesktopThread: true,
+        createThread: false,
+        backgroundCodex: true
+      }
+    }),
+    runCodexTurn: async (payload, emit) => {
+      runPayload = payload;
+      emit({ type: 'chat-complete', sessionId: payload.sessionId, turnId: payload.turnId });
+      return payload.sessionId;
+    }
+  });
+
+  const result = await service.sendChat({
+    projectId: 'project-1',
+    sessionId: 'thread-1',
+    clientTurnId: 'client-plan-turn',
+    message: 'Implement plan.',
+    visibleMessage: '执行计划',
+    collaborationMode: 'default',
+    planImplementation: {
+      planContent: '# 修复计划\n\n## Summary\n处理计划执行失败。'
+    }
+  });
+
+  assert.equal(result.delivery, 'started');
+  assert.equal(result.desktopBridge.mode, 'headless-local');
+  assert.equal(broadcasts.filter((payload) => payload.type === 'user-message').length, 1);
+  assert.equal(broadcasts.some((payload) => payload.type === 'status-update' && payload.source === 'desktop-ipc'), false);
+  assert.match(runPayload.message, /^PLEASE IMPLEMENT THIS PLAN:/);
+  assert.match(runPayload.message, /处理计划执行失败/);
 });
 
 test('sendChat uses headless local directly for existing desktop-ipc threads', async () => {
@@ -711,6 +813,7 @@ test('sendChat can create a background thread when desktop-ipc cannot create des
 
 test('sendChat asks desktop to hot-refresh after a background thread is created', async () => {
   const desktopRefreshes = [];
+  const routeBounces = [];
   const { service } = makeChatService({
     getDesktopBridgeStatus: async () => ({
       strict: true,
@@ -743,6 +846,10 @@ test('sendChat asks desktop to hot-refresh after a background thread is created'
     notifyDesktopThreadListChanged: async (payload) => {
       desktopRefreshes.push(payload);
       return { sent: true };
+    },
+    triggerDesktopRefreshForThread: async (threadId, options) => {
+      routeBounces.push({ threadId, options });
+      return { triggered: true };
     }
   });
 
@@ -764,6 +871,12 @@ test('sendChat asks desktop to hot-refresh after a background thread is created'
       threadId: 'background-thread-1',
       cwd: '/tmp/project',
       reason: 'background-thread-completed'
+    }
+  ]);
+  assert.deepEqual(routeBounces, [
+    {
+      threadId: 'background-thread-1',
+      options: { reason: 'background-thread-completed' }
     }
   ]);
 });

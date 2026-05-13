@@ -17,26 +17,24 @@ test('bridgeConnectionLabel shows idle desktop IPC as mirror-only sync', () => {
     selectedSession: { id: 'thread-1' }
   });
 
-  assert.equal(label.label, '桌面同步');
+  assert.equal(label.label, '已同步');
   assert.match(label.description, /移动端发送固定走后台 Codex/);
 });
 
-test('bridgeConnectionLabel distinguishes desktop and background running routes', () => {
-  assert.equal(
-    bridgeConnectionLabel('connected', { connected: true, mode: 'desktop-ipc' }, {
-      selectedSession: { id: 'thread-1' },
-      selectedRuntime: { status: 'running', source: 'desktop-ipc' }
-    }).label,
-    '桌面镜像中'
-  );
+test('bridgeConnectionLabel keeps running label compact while preserving source classes', () => {
+  const desktop = bridgeConnectionLabel('connected', { connected: true, mode: 'desktop-ipc' }, {
+    selectedSession: { id: 'thread-1' },
+    selectedRuntime: { status: 'running', source: 'desktop-ipc' }
+  });
+  const headless = bridgeConnectionLabel('connected', { connected: true, mode: 'desktop-ipc' }, {
+    selectedSession: { id: 'thread-1' },
+    selectedRuntime: { status: 'running', source: 'headless-local' }
+  });
 
-  assert.equal(
-    bridgeConnectionLabel('connected', { connected: true, mode: 'desktop-ipc' }, {
-      selectedSession: { id: 'thread-1' },
-      selectedRuntime: { status: 'running', source: 'headless-local' }
-    }).label,
-    '后台运行中'
-  );
+  assert.equal(desktop.label, '正在运行');
+  assert.match(desktop.className, /is-thread-ipc/);
+  assert.equal(headless.label, '正在运行');
+  assert.match(headless.className, /is-headless/);
 });
 
 test('bridgeConnectionLabel avoids claiming IPC route before running source is known', () => {
@@ -45,7 +43,7 @@ test('bridgeConnectionLabel avoids claiming IPC route before running source is k
     selectedRuntime: { status: 'running' }
   });
 
-  assert.equal(label.label, '运行确认中');
+  assert.equal(label.label, '正在运行');
   assert.match(label.description, /等待 sync runtime/);
 });
 

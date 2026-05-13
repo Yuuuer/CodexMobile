@@ -12,7 +12,7 @@
  * Outward: App 根布局顶部固定区域。
  */
 
-import { Bell, Check, Copy, FileText, GitBranch, GitCommitHorizontal, Menu, MoreHorizontal, RefreshCw, UploadCloud, Wifi } from 'lucide-react';
+import { Bell, Check, Copy, FileText, GitBranch, GitCommitHorizontal, Menu, MoreHorizontal, RefreshCw, UploadCloud } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { copyTextToClipboard } from '../utils/clipboard.js';
 import { isDraftSession } from '../app/session-utils.js';
@@ -102,7 +102,7 @@ export function TopBar({
       <div className="top-title">
         <strong>{title}</strong>
         <span className={`connection-status ${status.className}`} title={status.description} aria-label={status.description || status.label}>
-          <Wifi size={13} />
+          <span className="connection-dot" aria-hidden="true" />
           {status.label}
         </span>
       </div>

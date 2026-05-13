@@ -19,6 +19,9 @@ import {
 import {
   notifyDesktopThreadListChanged as notifyDesktopThreadListChangedInCodexApp
 } from './codex-app-server.js';
+import {
+  triggerDesktopRefreshForThread as triggerDesktopRefreshForThreadInCodexApp
+} from './desktop-refresh.js';
 import { registerMobileSession as registerMobileSessionInIndex } from './mobile-session-index.js';
 import { createChatQueue } from './chat-queue.js';
 import {
@@ -37,6 +40,20 @@ import {
 } from './runtime-debug.js';
 
 export { normalizeSelectedSkills } from './chat-request-prep.js';
+
+const IMPLEMENT_PLAN_MESSAGE_RE = /^(?:implement\s+plan\.?|执行计划)$/iu;
+
+function planImplementationHeadlessMessage({ codexMessage, visibleMessage, collaborationMode, planImplementation }) {
+  const codexText = String(codexMessage || '').trim();
+  const visibleText = String(visibleMessage || '').trim();
+  const isPlanImplementation = collaborationMode?.mode === 'default' &&
+    (IMPLEMENT_PLAN_MESSAGE_RE.test(codexText) || IMPLEMENT_PLAN_MESSAGE_RE.test(visibleText));
+  if (!isPlanImplementation) {
+    return codexMessage;
+  }
+  const planContent = String(planImplementation?.planContent || '').trim();
+  return planContent ? `PLEASE IMPLEMENT THIS PLAN:\n${planContent}` : codexMessage;
+}
 
 export function createChatService({
   imagePromptState,
@@ -60,7 +77,8 @@ export function createChatService({
   registerProjectlessThread = registerProjectlessThreadInCodexState,
   registerMobileSession = registerMobileSessionInIndex,
   rememberLiveSession = () => null,
-  notifyDesktopThreadListChanged = notifyDesktopThreadListChangedInCodexApp
+  notifyDesktopThreadListChanged = notifyDesktopThreadListChangedInCodexApp,
+  triggerDesktopRefreshForThread = triggerDesktopRefreshForThreadInCodexApp
 }) {
   const chatQueue = createChatQueue();
   const getConversationQueue = chatQueue.getConversationQueue;
@@ -210,6 +228,7 @@ export function createChatService({
       rememberTurn,
       rememberLiveSession,
       notifyDesktopThreadListChanged,
+      triggerDesktopRefreshForThread,
       emitJobEvent,
       scheduleAutoNameCompletedSession,
       onQueueDrained: () => setTimeout(() => runNextQueuedChat(queueKey), 0)
@@ -305,7 +324,7 @@ export function createChatService({
         reasoningEffort: reasoningEffortForTurn,
         serviceTier: serviceTierForTurn,
         permissionMode: body.permissionMode || 'bypassPermissions',
-        collaborationMode: collaborationMode?.mode === 'plan' ? collaborationMode : null
+        collaborationMode: collaborationMode || null
       }, { forceQueued: true, autoStart: false });
       runtimeDebugLine('sendChat.exit', { branch: 'hold-local-queue', delivery: 'queued', turnId });
       return {
@@ -407,6 +426,12 @@ export function createChatService({
         timestamp: new Date().toISOString()
       }
     });
+    const headlessCodexMessage = planImplementationHeadlessMessage({
+      codexMessage,
+      visibleMessage,
+      collaborationMode,
+      planImplementation: body.planImplementation
+    });
 
     if (imagePrompt) {
       runtimeDebugLine('sendChat.branch', { branch: 'image-chat' });
@@ -450,7 +475,7 @@ export function createChatService({
       draftSessionId,
       executionProjectPath,
       turnId,
-      codexMessage,
+      codexMessage: headlessCodexMessage,
       displayMessage,
       visibleMessage,
       attachments,
@@ -460,7 +485,7 @@ export function createChatService({
       reasoningEffort: reasoningEffortForTurn,
       serviceTier: serviceTierForTurn,
       permissionMode: body.permissionMode || 'bypassPermissions',
-      collaborationMode: collaborationMode?.mode === 'plan' ? collaborationMode : null
+      collaborationMode: collaborationMode || null
     });
 
     const delivery =

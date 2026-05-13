@@ -1,13 +1,13 @@
 .activity-summary {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   width: auto;
   max-width: min(100%, 736px);
-  min-height: 28px;
-  padding: 3px 8px;
+  min-height: 30px;
+  padding: 4px 6px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 7px;
   color: inherit;
   background: transparent;
   text-align: left;
@@ -22,7 +22,8 @@
   display: none;
 }
 
-.activity-summary span {
+.activity-summary-title,
+.activity-summary-duration {
   min-width: 0;
   flex: 0 0 auto;
   overflow: hidden;
@@ -30,6 +31,29 @@
   white-space: nowrap;
   font-size: 12px;
   line-height: 16px;
+}
+
+.activity-summary-title {
+  color: #3f4650;
+  font-weight: 520;
+}
+
+.activity-summary-duration {
+  color: #8b929c;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-summary-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.activity-summary-dot.is-running {
+  background: #10a37f;
+  animation: activityPulse 1.3s ease-in-out infinite;
 }
 
 .activity-chevron {
@@ -46,19 +70,19 @@
   display: grid;
   gap: 8px;
   max-width: min(100%, 736px);
-  margin-top: 6px;
-  padding: 10px 11px 11px;
-  border: 1px solid rgba(17, 24, 39, 0.09);
-  border-radius: 10px;
-  background: rgba(250, 251, 252, 0.86);
-  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 1px 0 rgba(255, 255, 255, 0.76) inset;
-  backdrop-filter: blur(16px) saturate(1.08);
+  margin-top: 2px;
+  margin-left: 9px;
+  padding: 4px 0 4px 13px;
+  border-left: 1px solid rgba(17, 24, 39, 0.12);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 [data-theme="dark"] .activity-timeline {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(24, 24, 27, 0.86);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: transparent;
+  box-shadow: none;
 }
 
 .activity-text {
@@ -89,6 +113,14 @@
 }
 
 [data-theme="dark"] .activity-live {
+  color: #a1a1aa;
+}
+
+[data-theme="dark"] .activity-summary-title {
+  color: #e4e4e7;
+}
+
+[data-theme="dark"] .activity-summary-duration {
   color: #a1a1aa;
 }
 
@@ -197,7 +229,7 @@
 }
 
 .activity-meta.is-running .activity-meta-summary {
-  color: #4f5f73;
+  color: #3f4650;
 }
 
 [data-theme="dark"] .activity-meta {
@@ -205,46 +237,7 @@
 }
 
 [data-theme="dark"] .activity-meta.is-running .activity-meta-summary {
-  color: #bfdbfe;
-}
-
-.activity-plan-confirmation {
-  display: grid;
-  gap: 9px;
-  color: #4b5563;
-}
-
-.activity-plan-confirmation-body {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  padding-left: 19px;
-}
-
-.activity-plan-confirmation-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid rgba(209, 42, 42, 0.18);
-  border-radius: 8px;
-  color: #b42318;
-  background: rgba(209, 42, 42, 0.07);
-  font-size: 13px;
-  line-height: 18px;
-  font-weight: 500;
-}
-
-.activity-plan-confirmation-button:disabled {
-  color: #7a8089;
-  background: rgba(17, 24, 39, 0.05);
-  border-color: rgba(17, 24, 39, 0.08);
-}
-
-.activity-plan-confirmation-button svg {
-  flex: 0 0 auto;
+  color: #e4e4e7;
 }
 
 .activity-meta-body {

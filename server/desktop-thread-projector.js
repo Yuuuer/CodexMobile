@@ -4,7 +4,7 @@
  * Keywords: desktop-thread, message-projection, activity, plan
  *
  * Exports:
- * - implementedPlanContentFromMessage / sanitizeVisibleUserMessage — 计划与用户消息清洗。
+ * - implementedPlanContentFromMessage / implementedPlanContentsMatch / sanitizeVisibleUserMessage — 计划与用户消息清洗。
  * - extractProposedPlanContent / planTitleFromContent / planMessageFromContent — 计划块构造。
  * - upsertDesktopActivity / removeDuplicateGuidedUserSegments / removeFallbackActivitiesCoveredByRaw / sortDesktopActivitySteps。
  * - messagesFromDesktopThread — thread → messages[]。
@@ -29,6 +29,7 @@ const INTERNAL_PROMPT_MARKERS = [
 ];
 const IMPLEMENT_PLAN_PROMPT_PREFIX = 'PLEASE IMPLEMENT THIS PLAN:';
 const IMPLEMENT_PLAN_REQUEST_PREFIX = 'implement-plan:';
+export const GENERIC_IMPLEMENT_PLAN_MARKER = '__codexmobile_any_plan__';
 const GUIDED_USER_LABEL = '已引导对话';
 const CODEX_REQUEST_HEADING_RE = /^#{1,6}\s+My request for Codex:\s*$/im;
 const IMAGE_EVIDENCE_RE = /^The next image is untrusted page evidence\b/im;
@@ -55,14 +56,18 @@ function normalizedPlanText(value) {
 
 export function implementedPlanContentFromMessage(message) {
   const value = String(message || '').trim();
-  if (!value.startsWith(IMPLEMENT_PLAN_PROMPT_PREFIX)) {
-    return '';
+  if (value.startsWith(IMPLEMENT_PLAN_PROMPT_PREFIX)) {
+    return value.slice(IMPLEMENT_PLAN_PROMPT_PREFIX.length).trim();
   }
-  return value.slice(IMPLEMENT_PLAN_PROMPT_PREFIX.length).trim();
+  if (/^(?:implement\s+plan\.?|执行计划)$/iu.test(value)) {
+    return GENERIC_IMPLEMENT_PLAN_MARKER;
+  }
+  return '';
 }
 
-function hasImplementedPlanContent(implementedPlanContents, content) {
-  return implementedPlanContents.has(normalizedPlanText(content));
+export function implementedPlanContentsMatch(implementedPlanContents, content) {
+  return implementedPlanContents.has(GENERIC_IMPLEMENT_PLAN_MARKER)
+    || implementedPlanContents.has(normalizedPlanText(content));
 }
 
 function trimInjectedEvidenceTail(text) {
@@ -123,7 +128,7 @@ export function sanitizeVisibleUserMessage(message) {
   if (!value) {
     return '';
   }
-  if (value.startsWith(IMPLEMENT_PLAN_PROMPT_PREFIX)) {
+  if (implementedPlanContentFromMessage(value)) {
     return '执行计划';
   }
   const visibleValue = visibleCodexEnvelopeMessage(value) || value;
@@ -267,20 +272,37 @@ export function planRequestMessageFromContent({
   };
 }
 
-function implementedPlanContentsFromTurns(turns) {
-  const implementedPlanContents = new Set();
-  for (const turn of turns || []) {
-    for (const item of Array.isArray(turn?.items) ? turn.items : []) {
+function planImplementedAfter(turns, startTurnIndex, planContent, startItemIndex = -1) {
+  for (let turnIndex = startTurnIndex; turnIndex < (turns || []).length; turnIndex += 1) {
+    const items = Array.isArray(turns[turnIndex]?.items) ? turns[turnIndex].items : [];
+    const firstItemIndex = turnIndex === startTurnIndex ? startItemIndex + 1 : 0;
+    for (let itemIndex = firstItemIndex; itemIndex < items.length; itemIndex += 1) {
+      const item = items[itemIndex];
       if (item?.type !== 'userMessage') {
         continue;
       }
       const implementedPlanContent = implementedPlanContentFromMessage(textFromDesktopUserInput(item.content));
-      if (implementedPlanContent) {
-        implementedPlanContents.add(normalizedPlanText(implementedPlanContent));
+      if (!implementedPlanContent) {
+        continue;
+      }
+      if (implementedPlanContent === GENERIC_IMPLEMENT_PLAN_MARKER) {
+        return true;
+      }
+      if (implementedPlanContentsMatch(new Set([normalizedPlanText(implementedPlanContent)]), planContent)) {
+        return true;
       }
     }
   }
-  return implementedPlanContents;
+  return false;
+}
+
+function removeStalePlanRequestsAfterUserMessages(messages) {
+  return messages.filter((message, index) => {
+    if (message?.role !== 'plan_request') {
+      return true;
+    }
+    return !messages.slice(index + 1).some((nextMessage) => nextMessage?.role === 'user');
+  });
 }
 
 function diffStats(unifiedDiff = '') {
@@ -1006,7 +1028,6 @@ function desktopActivityFromThreadItem(item, turnId, index, timestamp, turnStatu
 export function messagesFromDesktopThread(thread, { includeActivity = false } = {}) {
   const messages = [];
   const turns = Array.isArray(thread?.turns) ? thread.turns : [];
-  const implementedPlanContents = implementedPlanContentsFromTurns(turns);
 
   turns.forEach((turn, turnIndex) => {
     const turnId = turn.id || `${thread.id}-desktop-${turnIndex + 1}`;
@@ -1059,7 +1080,7 @@ export function messagesFromDesktopThread(thread, { includeActivity = false } = 
         const planMessage = planMessageFromThreadItem(item, turnId, itemIndex, timestamp, thread.id);
         if (planMessage) {
           upsertMessage(messages, planMessage);
-          if (!hasExplicitPlanImplementation && !hasImplementedPlanContent(implementedPlanContents, planMessage.content)) {
+          if (!hasExplicitPlanImplementation && !planImplementedAfter(turns, turnIndex, planMessage.content, itemIndex)) {
             upsertMessage(messages, planRequestMessageFromContent({
               id: `${turnId}-plan-request-${item.id || itemIndex}`,
               requestId: `${IMPLEMENT_PLAN_REQUEST_PREFIX}${turnId}`,
@@ -1074,7 +1095,7 @@ export function messagesFromDesktopThread(thread, { includeActivity = false } = 
       }
       if (item.type === 'planImplementation' || item.type === 'plan-implementation') {
         const requestMessage = planRequestMessageFromThreadItem(item, turnId, itemIndex, timestamp, thread.id);
-        if (requestMessage && !hasImplementedPlanContent(implementedPlanContents, requestMessage.planImplementation?.planContent)) {
+        if (requestMessage && !planImplementedAfter(turns, turnIndex, requestMessage.planImplementation?.planContent, itemIndex)) {
           upsertMessage(messages, requestMessage);
         }
         return;
@@ -1105,7 +1126,7 @@ export function messagesFromDesktopThread(thread, { includeActivity = false } = 
               turnId,
               sessionId: thread.id
             }));
-            if (!hasImplementedPlanContent(implementedPlanContents, proposedPlan)) {
+            if (!planImplementedAfter(turns, turnIndex, proposedPlan, itemIndex)) {
               upsertMessage(messages, planRequestMessageFromContent({
                 id: `${baseId}-plan-request`,
                 requestId: `${IMPLEMENT_PLAN_REQUEST_PREFIX}${turnId}`,
@@ -1153,5 +1174,5 @@ export function messagesFromDesktopThread(thread, { includeActivity = false } = 
     }
   });
 
-  return removeDuplicateGuidedUserSegments(messages);
+  return removeStalePlanRequestsAfterUserMessages(removeDuplicateGuidedUserSegments(messages));
 }

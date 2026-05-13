@@ -43,6 +43,7 @@ export function runQueuedHeadlessChatJob({
   rememberTurn,
   rememberLiveSession,
   notifyDesktopThreadListChanged,
+  triggerDesktopRefreshForThread,
   emitJobEvent,
   scheduleAutoNameCompletedSession,
   onQueueDrained
@@ -50,6 +51,17 @@ export function runQueuedHeadlessChatJob({
   const metadataUpdates = [];
   let lastBackgroundThread = null;
   let terminalEventSeen = false;
+  let desktopRefreshRequested = false;
+
+  function requestDesktopRefresh(threadId, reason) {
+    if (desktopRefreshRequested || !threadId) {
+      return;
+    }
+    desktopRefreshRequested = true;
+    Promise.resolve(triggerDesktopRefreshForThread?.(threadId, { reason })).catch((error) => {
+      console.warn('[desktop-refresh] Failed to trigger after chat:', error.message);
+    });
+  }
 
   function rememberStartedBackgroundThread(payload) {
     if (!payload?.sessionId || !job.draftSessionId) {
@@ -110,7 +122,7 @@ export function runQueuedHeadlessChatJob({
       reasoningEffort: job.reasoningEffort,
       serviceTier: job.serviceTier,
       permissionMode: job.permissionMode,
-      collaborationMode: job.collaborationMode?.mode === 'plan' ? job.collaborationMode : null,
+      collaborationMode: job.collaborationMode || null,
       turnId: job.turnId
     },
     (payload) => {
@@ -120,6 +132,10 @@ export function runQueuedHeadlessChatJob({
       };
       if (['chat-complete', 'chat-error', 'chat-aborted'].includes(eventPayload.type)) {
         terminalEventSeen = true;
+        requestDesktopRefresh(
+          eventPayload.sessionId || state.sessionId || sessionId || job.selectedSessionId,
+          lastBackgroundThread ? 'background-thread-completed' : 'headless-turn-completed'
+        );
       }
       if (eventPayload.sessionId) {
         state.sessionId = eventPayload.sessionId;
@@ -194,11 +210,15 @@ export function runQueuedHeadlessChatJob({
       }
       const snapshot = await refreshCodexCache();
       broadcast({ type: 'sync-complete', syncedAt: snapshot.syncedAt, projects: snapshot.projects });
+      const refreshThreadId = lastBackgroundThread?.threadId || state.sessionId || sessionId || job.selectedSessionId || null;
       if (lastBackgroundThread) {
         await notifyDesktopThreadListChanged?.({
           ...lastBackgroundThread,
           reason: 'background-thread-completed'
         });
+      }
+      if (refreshThreadId) {
+        requestDesktopRefresh(refreshThreadId, lastBackgroundThread ? 'background-thread-completed' : 'headless-turn-completed');
       }
     } catch (error) {
       console.warn('[sync] Failed to refresh after chat:', error.message);

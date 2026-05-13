@@ -182,21 +182,42 @@
 .connection-status {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 11px;
   line-height: 15px;
+  color: #6b7280;
 }
 
 .connection-status.is-connected {
-  color: var(--green);
+  color: #6b7280;
 }
 
-.connection-status.is-headless {
-  color: #2563eb;
+.connection-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.72;
 }
 
+.connection-status.is-running {
+  color: #1f2937;
+}
+
+.connection-status.is-running .connection-dot {
+  background: #10a37f;
+  opacity: 1;
+  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.12);
+  animation: connectionPulse 1.6s ease-in-out infinite;
+}
+
+.connection-status.is-headless,
 .connection-status.is-route-pending {
-  color: #7c3aed;
+  color: #4b5563;
+}
+
+.connection-status.is-ipc-ready .connection-dot {
+  background: #10a37f;
 }
 
 .connection-status.is-connecting {
@@ -205,4 +226,30 @@
 
 .connection-status.is-disconnected {
   color: var(--danger);
+}
+
+[data-theme="dark"] .connection-status,
+[data-theme="dark"] .connection-status.is-connected {
+  color: #a1a1aa;
+}
+
+[data-theme="dark"] .connection-status.is-running {
+  color: #f4f4f5;
+}
+
+[data-theme="dark"] .connection-status.is-headless,
+[data-theme="dark"] .connection-status.is-route-pending {
+  color: #d4d4d8;
+}
+
+@keyframes connectionPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.22);
+    opacity: 1;
+  }
 }

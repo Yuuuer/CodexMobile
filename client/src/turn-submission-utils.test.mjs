@@ -76,10 +76,10 @@ test('userMessageMetadataForSendMode marks steer messages as guided followups', 
   });
 });
 
-test('implementationPromptForPlan builds the desktop-compatible followup prompt', () => {
+test('implementationPromptForPlan builds the minimal plan implementation prompt', () => {
   assert.equal(
     implementationPromptForPlan('  1. 定位同步链路\n2. 补测试  '),
-    'PLEASE IMPLEMENT THIS PLAN:\n1. 定位同步链路\n2. 补测试'
+    'Implement plan.'
   );
   assert.equal(implementationPromptForPlan('  '), '');
 });

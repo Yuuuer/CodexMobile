@@ -152,16 +152,6 @@ function describeActivityStep(step) {
   const fileRefs = directRefs.size ? directRefs : outputRefs;
   const count = Math.max(1, fileRefs.size || (Array.isArray(step?.fileChanges) ? step.fileChanges.length : 0));
 
-  if (step?.kind === 'plan_implementation' || step?.kind === 'plan-implementation') {
-    return {
-      type: 'plan_implementation',
-      label: compactActivityText(label || '等待确认执行计划'),
-      detail,
-      count: 1,
-      unit: 'step'
-    };
-  }
-
   if (step?.kind === 'file_change' || Array.isArray(step?.fileChanges) && step.fileChanges.length) {
     return {
       type: 'edit',
@@ -295,9 +285,6 @@ function dominantActivityType(items) {
   if (items.some((item) => item.type === 'subagent')) {
     return 'subagent';
   }
-  if (items.some((item) => item.type === 'plan_implementation')) {
-    return 'plan_implementation';
-  }
   return items[0]?.type || 'tool';
 }
 
@@ -362,9 +349,6 @@ function summarizeActivityBatch(items, running) {
     }
     if (key === 'plan') {
       return failedOnly ? '计划更新失败' : active ? '正在更新计划' : '已更新计划';
-    }
-    if (key === 'plan_implementation') {
-      return failedOnly ? '计划确认失败' : active ? '等待确认执行计划' : '计划已确认执行';
     }
     if (key === 'tool') {
       if (group.failed && doneCount && !active) {
@@ -437,10 +421,6 @@ export function activityStepDetailTitle(step) {
   if (step.type === 'tool') {
     return `${failed ? '操作失败' : running ? '正在完成操作' : '已完成操作'}${suffix}`;
   }
-  if (step.type === 'plan_implementation') {
-    return failed ? '计划确认失败' : running ? '等待确认执行计划' : '计划已确认执行';
-  }
-
   const command = step.command || detail;
   return `${failed ? '运行失败' : running ? '正在运行' : '已运行'} ${conciseActivityDetail(command, 110)}`.trim();
 }

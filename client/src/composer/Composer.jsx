@@ -481,16 +481,6 @@ export function Composer({
           ))}
         </div>
       ) : null}
-      {runStatus ? (
-        <div className="composer-run-status is-running" role="status" aria-live="polite">
-          <span className="composer-run-dot" />
-          <span className="composer-run-main">
-            <strong>Codex 正在处理</strong>
-            <small>{runStatus.label}</small>
-          </span>
-          {runStatus.duration ? <span className="composer-run-time">{runStatus.duration}</span> : null}
-        </div>
-      ) : null}
       {!sendState.disabled || sendState.mode !== 'unavailable' ? null : (
         <div className="composer-run-status is-warning" role="status" aria-live="polite">
           <span className="composer-run-dot" />

@@ -1,7 +1,7 @@
 /**
  * 主侧栏抽屉：项目 / 会话列表、配额与设置入口、归档与子代理等。
  *
- * Keywords: drawer, sidebar, sessions, projects, settings
+ * Keywords: drawer, sidebar, sessions, projects, settings, desktop-refresh
  *
  * Exports:
  * - Drawer — 侧栏根组件。
@@ -108,6 +108,7 @@ export function Drawer({
   theme,
   setTheme,
   runtimeDebug,
+  desktopRefresh,
   refreshStatus
 }) {
   const [drawerView, setDrawerView] = useState('main');
@@ -126,6 +127,8 @@ export function Drawer({
   const [newConversationOpen, setNewConversationOpen] = useState(false);
   const [runtimeDebugError, setRuntimeDebugError] = useState('');
   const [runtimeDebugSaving, setRuntimeDebugSaving] = useState(false);
+  const [desktopRefreshError, setDesktopRefreshError] = useState('');
+  const [desktopRefreshSaving, setDesktopRefreshSaving] = useState(false);
   const normalizedDrawerQuery = drawerQuery.trim().toLowerCase();
   const runningCount = Object.values(sessionsByProject || {})
     .flatMap((sessions) => (Array.isArray(sessions) ? sessions : []))
@@ -282,6 +285,21 @@ export function Drawer({
     }
   }
 
+  async function handleDesktopRefreshToggle(event) {
+    const enabled = event.target.checked;
+    setDesktopRefreshError('');
+    setDesktopRefreshSaving(true);
+    try {
+      await apiFetch('/api/desktop-refresh', { method: 'POST', body: { enabled } });
+      await refreshStatus?.();
+    } catch (error) {
+      setDesktopRefreshError(error.message || '保存失败');
+      await refreshStatus?.();
+    } finally {
+      setDesktopRefreshSaving(false);
+    }
+  }
+
   if (drawerView === 'settings') {
     return (
       <>
@@ -349,6 +367,28 @@ export function Drawer({
                     <small>已通过环境变量 CODEXMOBILE_RUNTIME_DEBUG 启用（与本开关可同时生效）。</small>
                   ) : null}
                   {runtimeDebugError ? <small className="runtime-debug-error">{runtimeDebugError}</small> : null}
+                </div>
+              </div>
+              <div className="theme-setting">
+                <label className="setting-row">
+                  <span>实验性桌面自动刷新</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(desktopRefresh?.enabled)}
+                    disabled={desktopRefreshSaving || !desktopRefresh?.supported}
+                    onChange={handleDesktopRefreshToggle}
+                  />
+                </label>
+                <div className="theme-setting-title">
+                  <small>
+                    开启后，手机端 headless-local 任务完成时会尝试让 Codex.app 先打开设置页再回到目标线程，用 route bounce 强制重挂载当前线程。
+                  </small>
+                  <small>
+                    这是临时 workaround，可能抢桌面焦点或切换当前页面；默认关闭，只建议你想观察桌面自动跟随刷新时开启。
+                  </small>
+                  {!desktopRefresh?.supported ? <small>仅 macOS 上的 Codex.app 支持。</small> : null}
+                  {desktopRefresh?.lastError ? <small>上次触发失败：{desktopRefresh.lastError}</small> : null}
+                  {desktopRefreshError ? <small className="runtime-debug-error">{desktopRefreshError}</small> : null}
                 </div>
               </div>
             </section>

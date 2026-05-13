@@ -87,6 +87,30 @@ test('headless and desktop running events share the same runtime projection shap
   assert.equal(snapshot.runtimeById['headless-session'].source, 'headless-local');
 });
 
+test('assistant plan updates preserve plan implementation metadata', () => {
+  const [event] = normalizeLegacyPayloadToSyncEvents({
+    type: 'assistant-update',
+    sessionId: 'session-1',
+    turnId: 'turn-1',
+    messageId: 'implement-plan:app-turn-1',
+    content: '<proposed_plan>\n# 修复计划\n</proposed_plan>',
+    planImplementation: {
+      requestId: 'implement-plan:app-turn-1',
+      turnId: 'app-turn-1',
+      planContent: '# 修复计划',
+      completed: false
+    }
+  });
+
+  assert.equal(event.eventType, 'message.assistant.completed');
+  assert.deepEqual(event.message.planImplementation, {
+    requestId: 'implement-plan:app-turn-1',
+    turnId: 'app-turn-1',
+    planContent: '# 修复计划',
+    completed: false
+  });
+});
+
 test('sessions synced and rename events update sidebar projection data', () => {
   const store = createSyncStore();
   const [synced] = normalizeLegacyPayloadToSyncEvents({

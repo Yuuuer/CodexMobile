@@ -1,7 +1,7 @@
 /**
  * CodexMobile 服务端主入口：装配 HTTP/HTTPS、WebSocket、路由与 Codex 缓存同步。
  *
- * Keywords: http-server, https, websocket, codex-cache, auth, routes
+ * Keywords: http-server, https, websocket, codex-cache, auth, routes, desktop-refresh
  *
  * Exports:
  * - 无 default；副作用启动 main()。
@@ -75,6 +75,11 @@ import {
   runtimeDebugStatusActiveRuns,
   setRuntimeDebugUiEnabled
 } from './runtime-debug.js';
+import {
+  configureDesktopRefresh,
+  getDesktopRefreshPublicState,
+  setDesktopRefreshEnabled
+} from './desktop-refresh.js';
 import { readBody, sendJson } from './http-utils.js';
 import { createPushService } from './push-service.js';
 import { createStaticService } from './static-service.js';
@@ -83,6 +88,7 @@ import { createSyncBridge } from './sync/sync-bridge.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
 configureRuntimeDebug({ rootDir: ROOT_DIR });
+configureDesktopRefresh({ rootDir: ROOT_DIR });
 const CLIENT_DIST = path.join(ROOT_DIR, 'client', 'dist');
 const UPLOAD_ROOT = path.join(ROOT_DIR, '.codexmobile', 'uploads');
 const IMAGE_PROMPT_STATE = path.join(ROOT_DIR, '.codexmobile', 'state', 'image-prompts.json');
@@ -596,6 +602,7 @@ async function publicStatus(authenticated) {
     localHeadlessRuns: activeRuns,
     syncState: syncBridge.publicState(),
     runtimeDebug: getRuntimeDebugPublicState(),
+    desktopRefresh: getDesktopRefreshPublicState(),
     auth: {
       required: true,
       authenticated,
@@ -642,6 +649,13 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     setRuntimeDebugUiEnabled(Boolean(body.enabled));
     sendJson(res, 200, getRuntimeDebugPublicState());
+    return;
+  }
+
+  if (method === 'POST' && pathname === '/api/desktop-refresh') {
+    const body = await readBody(req);
+    const desktopRefresh = setDesktopRefreshEnabled(Boolean(body.enabled));
+    sendJson(res, 200, { success: true, desktopRefresh });
     return;
   }
 

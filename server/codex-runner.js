@@ -759,15 +759,20 @@ function emitPlanImplementationRequest(message, sessionId, turnId, emit) {
   const requestThreadId = String(params.threadId || sessionId || '').trim();
   const planContent = String(params.planContent || '').trim();
   const requestId = String(message?.id || (requestTurnId ? `implement-plan:${requestTurnId}` : '')).trim();
+  const content = /<proposed_plan\b/i.test(planContent)
+    ? planContent
+    : `<proposed_plan>\n${planContent}\n</proposed_plan>`;
   emit({
-    type: 'activity-update',
+    type: 'assistant-update',
     sessionId: requestThreadId || sessionId,
     turnId,
     messageId: requestId || `${turnId}-plan-implementation`,
-    kind: 'plan_implementation',
-    label: '等待确认执行计划',
-    status: 'running',
-    detail: planContent,
+    role: 'assistant',
+    kind: 'agent_message',
+    phase: 'final_answer',
+    content,
+    status: 'completed',
+    done: true,
     timestamp: new Date().toISOString(),
     planImplementation: {
       requestId: requestId || (requestTurnId ? `implement-plan:${requestTurnId}` : ''),

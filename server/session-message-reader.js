@@ -25,6 +25,7 @@ import {
 import {
   extractProposedPlanContent,
   implementedPlanContentFromMessage,
+  implementedPlanContentsMatch,
   messagesFromDesktopThread as defaultMessagesFromDesktopThread,
   planMessageFromContent,
   planRequestMessageFromContent,
@@ -94,7 +95,6 @@ function ensureRolloutTurn(turns, sessionId, timestamp) {
 export function messagesFromRolloutJsonl(content, sessionId) {
   const messages = [];
   const turns = [];
-  const implementedPlanContents = new Set();
   const userCountsByTurn = new Map();
   const lines = String(content || '').split(/\r?\n/);
 
@@ -132,7 +132,7 @@ export function messagesFromRolloutJsonl(content, sessionId) {
     }
     const implementedPlanContent = role === 'user' ? implementedPlanContentFromMessage(contentText) : '';
     if (implementedPlanContent) {
-      implementedPlanContents.add(implementedPlanContent.replace(/\s+/g, ' ').trim());
+      removeImplementedPlanRequests(messages, implementedPlanContent);
     }
     const turn = ensureRolloutTurn(turns, sessionId, timestamp);
     let userIndex = -1;
@@ -180,18 +180,43 @@ export function messagesFromRolloutJsonl(content, sessionId) {
     });
   }
 
-  const dedupedMessages = removeDuplicateGuidedUserSegments(messages);
-  const filteredMessages = implementedPlanContents.size
-    ? dedupedMessages.filter((message) => {
-      if (message.role !== 'plan_request') {
-        return true;
-      }
-      const planContent = String(message.planImplementation?.planContent || '').replace(/\s+/g, ' ').trim();
-      return !implementedPlanContents.has(planContent);
-    })
-    : dedupedMessages;
+  return { messages: removeStalePlanRequestsAfterUserMessages(removeDuplicateGuidedUserSegments(messages)), turns };
+}
 
-  return { messages: filteredMessages, turns };
+function removeStalePlanRequestsAfterUserMessages(messages) {
+  return messages.filter((message, index) => {
+    if (message?.role !== 'plan_request') {
+      return true;
+    }
+    return !messages.slice(index + 1).some((nextMessage) => nextMessage?.role === 'user');
+  });
+}
+
+function removeImplementedPlanRequests(messages, implementedPlanContent) {
+  const normalizedImplemented = String(implementedPlanContent || '').replace(/\s+/g, ' ').trim();
+  if (!normalizedImplemented) {
+    return;
+  }
+  const implementedSet = new Set([normalizedImplemented]);
+  if (implementedPlanContentsMatch(implementedSet, '')) {
+    const latestRequest = messages
+      .map((message, messageIndex) => ({ message, messageIndex }))
+      .reverse()
+      .find(({ message }) => message.role === 'plan_request' && !message.planImplementation?.completed);
+    if (latestRequest) {
+      messages.splice(latestRequest.messageIndex, 1);
+    }
+    return;
+  }
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (
+      message.role === 'plan_request' &&
+      implementedPlanContentsMatch(implementedSet, message.planImplementation?.planContent)
+    ) {
+      messages.splice(index, 1);
+    }
+  }
 }
 
 async function readRolloutThreadFromFile(filePath, sessionId) {

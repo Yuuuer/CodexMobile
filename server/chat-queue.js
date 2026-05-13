@@ -34,7 +34,7 @@ function serializeQueueJob(job) {
     attachments: Array.isArray(job.attachments) ? job.attachments : [],
     selectedSkills: Array.isArray(job.selectedSkills) ? job.selectedSkills : [],
     fileMentions: Array.isArray(job.fileMentions) ? job.fileMentions : [],
-    collaborationMode: job.collaborationMode?.mode === 'plan' ? 'plan' : null,
+    collaborationMode: job.collaborationMode?.mode || null,
     createdAt: job.createdAt || new Date().toISOString(),
     sessionId: job.selectedSessionId || null,
     draftSessionId: job.draftSessionId || null

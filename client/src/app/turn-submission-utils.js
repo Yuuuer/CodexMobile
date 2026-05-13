@@ -67,7 +67,7 @@ export function implementationPromptForPlan(planContent) {
   if (!text) {
     return '';
   }
-  return `${IMPLEMENT_PLAN_PROMPT_PREFIX}\n${text}`;
+  return 'Implement plan.';
 }
 
 export function prepareComposerSubmission(message, attachments = [], fileMentions = [], requestedCollaborationMode = null) {

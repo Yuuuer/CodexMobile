@@ -104,7 +104,8 @@ function assistantMessage(payload = {}) {
     sessionId: payload.sessionId || null,
     turnId: payload.turnId || payload.clientTurnId || null,
     done: payload.done !== false,
-    phase: payload.phase || null
+    phase: payload.phase || null,
+    planImplementation: payload.planImplementation || null
   };
 }
 

@@ -477,6 +477,128 @@ test('messagesFromRolloutJsonl removes stale plan request after implementation s
   assert.equal(result.messages[2].content, '执行计划');
 });
 
+test('messagesFromRolloutJsonl removes stale plan request after minimal implementation prompt', () => {
+  const planContent = '# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。';
+  const content = [
+    JSON.stringify({
+      timestamp: '2026-05-08T18:29:01.775Z',
+      type: 'turn_context',
+      payload: { turn_id: 'turn-1' }
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-08T18:29:02.000Z',
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: '/plan 测试计划卡片' }]
+      }
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-08T18:29:11.962Z',
+      type: 'response_item',
+      payload: {
+        id: 'assistant-plan-1',
+        type: 'message',
+        role: 'assistant',
+        phase: 'final_answer',
+        content: [{ type: 'output_text', text: `<proposed_plan>\n${planContent}\n</proposed_plan>` }]
+      }
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-08T18:30:01.000Z',
+      type: 'turn_context',
+      payload: { turn_id: 'turn-2' }
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-08T18:30:02.000Z',
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: 'Implement plan.' }]
+      }
+    })
+  ].join('\n');
+
+  const result = messagesFromRolloutJsonl(content, 'session-1');
+
+  assert.deepEqual(result.messages.map((message) => message.role), ['user', 'plan', 'user']);
+  assert.equal(result.messages[1].content, planContent);
+  assert.equal(result.messages[2].content, '执行计划');
+});
+
+test('messagesFromRolloutJsonl keeps a new plan actionable after an earlier minimal implementation prompt', () => {
+  const firstPlan = '# 第一份计划\n\n## Summary\n旧计划。';
+  const secondPlan = '# 第二份计划\n\n## Summary\n新计划。';
+  const content = [
+    JSON.stringify({ timestamp: '2026-05-08T18:29:01.775Z', type: 'turn_context', payload: { turn_id: 'turn-1' } }),
+    JSON.stringify({
+      timestamp: '2026-05-08T18:29:11.962Z',
+      type: 'response_item',
+      payload: {
+        id: 'assistant-plan-1',
+        type: 'message',
+        role: 'assistant',
+        phase: 'final_answer',
+        content: [{ type: 'output_text', text: `<proposed_plan>\n${firstPlan}\n</proposed_plan>` }]
+      }
+    }),
+    JSON.stringify({ timestamp: '2026-05-08T18:30:01.000Z', type: 'turn_context', payload: { turn_id: 'turn-2' } }),
+    JSON.stringify({
+      timestamp: '2026-05-08T18:30:02.000Z',
+      type: 'response_item',
+      payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Implement plan.' }] }
+    }),
+    JSON.stringify({ timestamp: '2026-05-08T18:31:01.000Z', type: 'turn_context', payload: { turn_id: 'turn-3' } }),
+    JSON.stringify({
+      timestamp: '2026-05-08T18:31:11.962Z',
+      type: 'response_item',
+      payload: {
+        id: 'assistant-plan-2',
+        type: 'message',
+        role: 'assistant',
+        phase: 'final_answer',
+        content: [{ type: 'output_text', text: `<proposed_plan>\n${secondPlan}\n</proposed_plan>` }]
+      }
+    })
+  ].join('\n');
+
+  const result = messagesFromRolloutJsonl(content, 'session-1');
+
+  assert.deepEqual(result.messages.map((message) => message.role), ['plan', 'user', 'plan', 'plan_request']);
+  assert.equal(result.messages[2].content, secondPlan);
+  assert.equal(result.messages[3].planImplementation.planContent, secondPlan);
+});
+
+test('messagesFromRolloutJsonl hides stale plan request after a later user message', () => {
+  const planContent = '# 移动端计划模式测试计划\n\n## Summary\n创建一个轻量测试计划。';
+  const content = [
+    JSON.stringify({ timestamp: '2026-05-08T18:29:01.775Z', type: 'turn_context', payload: { turn_id: 'turn-1' } }),
+    JSON.stringify({
+      timestamp: '2026-05-08T18:29:11.962Z',
+      type: 'response_item',
+      payload: {
+        id: 'assistant-plan-1',
+        type: 'message',
+        role: 'assistant',
+        phase: 'final_answer',
+        content: [{ type: 'output_text', text: `<proposed_plan>\n${planContent}\n</proposed_plan>` }]
+      }
+    }),
+    JSON.stringify({ timestamp: '2026-05-08T18:30:01.000Z', type: 'turn_context', payload: { turn_id: 'turn-2' } }),
+    JSON.stringify({
+      timestamp: '2026-05-08T18:30:02.000Z',
+      type: 'response_item',
+      payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '修改这个问题' }] }
+    })
+  ].join('\n');
+
+  const result = messagesFromRolloutJsonl(content, 'session-1');
+
+  assert.deepEqual(result.messages.map((message) => message.role), ['plan', 'user']);
+});
+
 test('messagesFromRolloutJsonl marks second user message in one turn as guided', () => {
   const content = [
     JSON.stringify({
