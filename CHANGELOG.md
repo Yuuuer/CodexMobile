@@ -4,6 +4,27 @@ All notable changes to CodexMobile are tracked here.
 
 ## Unreleased
 
+## [1.4.0] - 2026-05-14
+
+### Added
+
+- Added PWA update detection and an in-app update prompt so mobile clients can refresh onto newly deployed builds.
+- Added desktop handoff state helpers for clearer "back to desktop" UI behavior.
+- Added broader sync socket, activity card, and desktop runner status test coverage.
+
+### Changed
+
+- Rebranded the former codex-web-facing labels toward CodexPocket.
+- Coalesced live and loaded-session activity cards so duplicated execution cards collapse into one clearer thread view.
+- Folded noisy tool groups and desktop handoff state into cleaner activity and top-bar presentations.
+- Refined mobile workflow handling across composer sends, top-bar status, and desktop/background routing.
+- Updated the package version to `1.4.0`.
+
+### Fixed
+
+- Stabilized activity-card reconciliation when live runtime state and loaded session history arrive in different orders.
+- Improved service-worker cache handling for built assets during mobile/PWA updates.
+
 ## [1.3.0] - 2026-05-13
 
 ### Added
