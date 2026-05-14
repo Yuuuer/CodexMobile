@@ -448,12 +448,14 @@ export function activityBodyItemsForDisplay(visibleItems, overflowItems) {
 
 export function activityMetaShouldOpen(item, { forceOpen = false } = {}) {
   void item;
-  return Boolean(forceOpen);
+  void forceOpen;
+  return false;
 }
 
 export function activityStepDetailShouldOpen(step, { forceOpen = false } = {}) {
   void step;
-  return Boolean(forceOpen);
+  void forceOpen;
+  return false;
 }
 
 export function activityStepDetailTitle(step) {

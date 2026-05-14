@@ -23,6 +23,7 @@ import {
   selectedSessionIsRunning,
   sessionMessagesApiPath,
   sessionRunBadgeState,
+  sourceMediaKind,
   titleFromFirstMessage
 } from './app/session-utils.js';
 import { completeMessagesForTurnCompletion, runtimeKeysForPayload } from './app/useTurnRuntime.js';
@@ -353,6 +354,13 @@ test('localFilePreviewPath routes local files through the mobile preview page', 
     localFilePreviewPath('/Users/demo/report.md', 'secret token'),
     '/preview/file?path=%2FUsers%2Fdemo%2Freport.md'
   );
+});
+
+test('sourceMediaKind distinguishes image syntax targets that are actually video or audio files', () => {
+  assert.equal(sourceMediaKind('/Users/demo/out/showcase.mp4'), 'video');
+  assert.equal(sourceMediaKind('/Users/demo/out/contact-sheet.png'), 'image');
+  assert.equal(sourceMediaKind('https://example.com/narration.m4a?download=1'), 'audio');
+  assert.equal(sourceMediaKind('/Users/demo/report.md'), '');
 });
 
 test('sessionMessagesApiPath supports older-page pagination params', () => {

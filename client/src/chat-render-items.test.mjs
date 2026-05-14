@@ -51,6 +51,37 @@ test('chatRenderItems attaches completed file summary below the assistant result
   assert.equal(items[2].fileSummaries[0].files[0].path, 'client/src/chat/ActivityMessage.jsx');
 });
 
+test('chatRenderItems repairs late completed activity order before the assistant result', () => {
+  const items = chatRenderItems([
+    { id: 'user-1', role: 'user', turnId: 'turn-1', content: '修一下' },
+    { id: 'answer-1', role: 'assistant', turnId: 'turn-1', content: '改好了' },
+    fileChangeActivity
+  ]);
+
+  assert.deepEqual(items.map((item) => [item.type, item.message?.role || 'fileSummary']), [
+    ['message', 'user'],
+    ['message', 'activity'],
+    ['message', 'assistant']
+  ]);
+  assert.equal(items[2].fileSummaries.length, 1);
+  assert.equal(items[2].fileSummaries[0].files[0].path, 'client/src/chat/ActivityMessage.jsx');
+});
+
+test('chatRenderItems attaches segmented activity file summary to a final assistant without segment index', () => {
+  const items = chatRenderItems([
+    { id: 'user-1', role: 'user', turnId: 'turn-1', content: '修一下' },
+    { ...fileChangeActivity, id: 'activity-segment-1', segmentIndex: 1 },
+    { id: 'answer-1', role: 'assistant', turnId: 'turn-1', content: '改好了' }
+  ]);
+
+  assert.deepEqual(items.map((item) => [item.type, item.message?.role || 'fileSummary']), [
+    ['message', 'user'],
+    ['message', 'activity'],
+    ['message', 'assistant']
+  ]);
+  assert.equal(items[2].fileSummaries.length, 1);
+});
+
 test('chatRenderItems waits for the assistant result before showing a file summary', () => {
   const items = chatRenderItems([
     { id: 'user-1', role: 'user', turnId: 'turn-1', content: '修一下' },

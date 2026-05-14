@@ -9,7 +9,8 @@ const outputDir = path.join(repoRoot, 'docs/images/codexmobile-real-ui');
 const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const port = 4177;
 const baseUrl = `http://127.0.0.1:${port}`;
-const screenshotSize = {width: 720, height: 1280};
+const viewportSize = {width: 440, height: 956};
+const deviceScaleFactor = 3;
 
 const scenes = [
   ['01-chat-execution', 'chat'],
@@ -61,8 +62,8 @@ try {
         '--disable-component-update',
         '--disable-sync',
         '--hide-scrollbars',
-        '--force-device-scale-factor=1',
-        `--window-size=${screenshotSize.width},${screenshotSize.height}`,
+        `--force-device-scale-factor=${deviceScaleFactor}`,
+        `--window-size=${viewportSize.width},${viewportSize.height}`,
         `--screenshot=${output}`,
         `${baseUrl}/demo/screenshots?${params.toString()}`
       ], {stdio: 'inherit'});

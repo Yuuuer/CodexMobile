@@ -1,11 +1,11 @@
 /**
  * 客户端会话域工具集：时间路径格式化、本地文件/图片 URL、草稿与列表合并、桌面 thread runtime 判定与轮次可见性。
  *
- * Keywords: session-utils, draft-session, thread-runtime, running-activity
+ * Keywords: session-utils, draft-session, thread-runtime, running-activity, media
  *
  * Exports:
  * - 通用与展示 — `formatTime`、`formatDuration*`、`subAgentRoleLabel`、`compactPath`、`safeStoredJsonArray` 等。
- * - 上下文与媒体 — `emptyContextStatus`、`imageUrlWithRetry`、本地源与 `local*ApiPath`、`dataImageObjectUrl`、`useResolvedImageSource`。
+ * - 上下文与媒体 — `emptyContextStatus`、`imageUrlWithRetry`、`sourceMediaKind`、本地源与 `local*ApiPath`、`dataImageObjectUrl`、`useResolvedImageSource`。
  * - 会话生命周期 — `createClientTurnId`、`createDraftSession`、`resolveNewConversationProject`、`resolveComposerGitProject`、`isDraftSession`、`sessionMessagesApiPath`、标题补丁、`upsertSessionInProject`。
  * - Runtime — `payloadRunKeys`、`selectedRunKeys`、`reconcileThreadRuntimeWithSessions`、`is*Runtime`、`runningByIdWithSelectedActivity`、`sessionRunBadgeState`、`selectedSessionIsRunning`、`hasVisibleAssistantForTurn` 等。
  *
@@ -175,6 +175,36 @@ export function imageUrlWithRetry(url, retryKey) {
 }
 
 const resolvedImageSourceCache = new Map();
+const IMAGE_SOURCE_PATTERN = /(?:^data:image\/|\.(?:png|jpe?g|webp|gif|svg|ico)(?:$|[:?#]))/i;
+const VIDEO_SOURCE_PATTERN = /\.(?:mp4|m4v|mov|webm|ogv)(?:$|[:?#])/i;
+const AUDIO_SOURCE_PATTERN = /\.(?:mp3|m4a|aac|wav|ogg|flac)(?:$|[:?#])/i;
+
+export function sourceMediaKind(value, contentType = '') {
+  const lowerType = String(contentType || '').toLowerCase();
+  if (lowerType.startsWith('image/')) {
+    return 'image';
+  }
+  if (lowerType.startsWith('video/')) {
+    return 'video';
+  }
+  if (lowerType.startsWith('audio/')) {
+    return 'audio';
+  }
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+  if (IMAGE_SOURCE_PATTERN.test(raw)) {
+    return 'image';
+  }
+  if (VIDEO_SOURCE_PATTERN.test(raw)) {
+    return 'video';
+  }
+  if (AUDIO_SOURCE_PATTERN.test(raw)) {
+    return 'audio';
+  }
+  return '';
+}
 
 export function isLocalImageSource(value) {
   const raw = String(value || '').trim();

@@ -1,7 +1,7 @@
 /**
- * Markdown 消息正文：GFM、安全链接、本地文件/图片、Mermaid、代码块与记忆引用展示。
+ * Markdown 消息正文：GFM、安全链接、本地文件/图片/视频、Mermaid、代码块与记忆引用展示。
  *
- * Keywords: react-markdown, message content, citation, image preview
+ * Keywords: react-markdown, message content, citation, media preview
  *
  * Exports:
  * - MarkdownContent、MessageContent — 完整与拆分正文渲染。
@@ -13,11 +13,17 @@
  */
 
 import { BookOpen, Check, Copy, RotateCcw } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { memo, useEffect, useId, useRef, useState } from 'react';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
-import { isLocalFileSource, isLocalImageSource, localFilePreviewPath } from '../app/session-utils.js';
+import {
+  isLocalFileSource,
+  isLocalImageSource,
+  localFileApiPath,
+  localFilePreviewPath,
+  sourceMediaKind
+} from '../app/session-utils.js';
 import { copyTextToClipboard } from '../utils/clipboard.js';
 import { GeneratedImage } from './ImagePreview.jsx';
 import { formatCitationLines, shortRolloutId, splitMemoryCitationBlock } from './memory-citation.js';
@@ -46,6 +52,10 @@ export function MarkdownContent({ text, onPreviewImage, className = 'message-con
           img({ node, src, alt }) {
             if (!src) {
               return null;
+            }
+            const kind = sourceMediaKind(src);
+            if (kind === 'video' || kind === 'audio') {
+              return <MarkdownMediaPreview kind={kind} src={src} title={alt || (kind === 'video' ? '视频' : '音频')} />;
             }
             return <GeneratedImage part={{ type: 'image', url: src, alt: alt || '图片' }} onPreviewImage={onPreviewImage} />;
           },
@@ -82,6 +92,46 @@ export function MarkdownContent({ text, onPreviewImage, className = 'message-con
     </div>
   );
 }
+
+const MarkdownMediaPreview = memo(function MarkdownMediaPreview({ kind, src, title }) {
+  const [failed, setFailed] = useState(false);
+  const raw = String(src || '').trim();
+  const mediaSrc = isLocalFileSource(raw) ? localFileApiPath(raw) : raw;
+  const previewHref = isLocalFileSource(raw) ? localFilePreviewPath(raw) : raw;
+  const label = title || (kind === 'video' ? '视频' : '音频');
+  if (!mediaSrc) {
+    return null;
+  }
+
+  return (
+    <div className={`message-media-card is-${kind} ${failed ? 'is-failed' : ''}`}>
+      {kind === 'video' ? (
+        <video
+          className="message-media"
+          src={mediaSrc}
+          controls
+          playsInline
+          preload="metadata"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <audio
+          className="message-media-audio"
+          src={mediaSrc}
+          controls
+          preload="metadata"
+          onError={() => setFailed(true)}
+        />
+      )}
+      <div className="message-media-meta">
+        <span>{failed ? `${label}加载失败` : label}</span>
+        <a href={previewHref || mediaSrc} target="_blank" rel="noreferrer noopener">
+          打开文件
+        </a>
+      </div>
+    </div>
+  );
+});
 
 export function MessageContent({ content, onPreviewImage }) {
   const { text, citation } = splitMemoryCitationBlock(content);
@@ -422,6 +472,10 @@ function markdownImageFromLine(line) {
   }
   const url = String(match[2] || match[3] || '').trim();
   if (!url) {
+    return null;
+  }
+  const kind = sourceMediaKind(url);
+  if (kind && kind !== 'image') {
     return null;
   }
   return { type: 'image', alt: match[1] || '图片', url };

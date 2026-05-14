@@ -223,7 +223,7 @@ const longTaskActivityMessage = {
       completedAt: '2026-05-15T02:12:08+08:00',
       subAgents: [
         { nickname: 'UI 巡检', role: 'explorer', statusText: '已确认抽屉层级' },
-        { nickname: '截图校验', role: 'worker', statusText: '已确认 9:16 输出' }
+        { nickname: '截图校验', role: 'worker', statusText: '已确认 iPhone 17 Pro Max viewport' }
       ]
     },
     {
@@ -261,10 +261,10 @@ const longTaskActivityMessage = {
     {
       id: 'long-shot-1',
       kind: 'command_execution',
-      label: '重新生成 9:16 截图',
+      label: '重新生成 iPhone 17 Pro Max 截图',
       command: 'node marketing/real-ui-screenshots/generate.mjs',
-      detail: '输出 720x1280 的深色 / 浅色 UI 演示图',
-      output: 'real-ui-03-composer-workflow-dark.png 720x1280\nreal-ui-03-composer-workflow-light.png 720x1280',
+      detail: '以 440x956 viewport 输出 1320x2868 的深色 / 浅色 UI 演示图',
+      output: 'real-ui-03-composer-workflow-dark.png 1320x2868\nreal-ui-03-composer-workflow-light.png 1320x2868',
       status: 'running',
       startedAt: '2026-05-15T02:12:50+08:00'
     }
@@ -592,7 +592,7 @@ function composerProps({ scene }) {
 }
 
 function shellClass(scene) {
-  const classes = ['app-shell'];
+  const classes = ['app-shell', 'is-screenshot-demo'];
   if (scene === 'drawer') {
     classes.push('drawer-active');
   }
@@ -600,6 +600,166 @@ function shellClass(scene) {
     classes.push('is-long-task-demo');
   }
   return classes.join(' ');
+}
+
+function ScreenshotViewportGuard() {
+  return (
+    <style>
+      {`
+        .app-shell.is-screenshot-demo {
+          width: 100vw;
+          max-width: 100vw;
+          overflow: hidden;
+        }
+
+        .app-shell.is-screenshot-demo .chat-pane {
+          width: 100vw;
+          max-width: 100vw;
+          padding-left: 14px;
+          padding-right: 18px;
+          overflow-x: hidden;
+        }
+
+        .app-shell.is-screenshot-demo .chat-content,
+        .app-shell.is-screenshot-demo .message-row,
+        .app-shell.is-screenshot-demo .message-stack,
+        .app-shell.is-screenshot-demo .message-bubble,
+        .app-shell.is-screenshot-demo .activity-bubble,
+        .app-shell.is-screenshot-demo .activity-timeline,
+        .app-shell.is-screenshot-demo .activity-segment,
+        .app-shell.is-screenshot-demo .activity-segment-text,
+        .app-shell.is-screenshot-demo .activity-segment-tools,
+        .app-shell.is-screenshot-demo .activity-meta,
+        .app-shell.is-screenshot-demo .activity-meta-body,
+        .app-shell.is-screenshot-demo .activity-command-detail,
+        .app-shell.is-screenshot-demo .activity-shell,
+        .app-shell.is-screenshot-demo .activity-file-summary,
+        .app-shell.is-screenshot-demo .composer-wrap,
+        .app-shell.is-screenshot-demo .composer {
+          max-width: 100%;
+          min-width: 0;
+          overflow-x: hidden;
+        }
+
+        .app-shell.is-screenshot-demo .activity-timeline {
+          display: block;
+          width: calc(100% - 9px);
+          max-width: calc(100% - 9px);
+        }
+
+        .app-shell.is-screenshot-demo .activity-segment,
+        .app-shell.is-screenshot-demo .activity-segment-text,
+        .app-shell.is-screenshot-demo .activity-segment-tools,
+        .app-shell.is-screenshot-demo .activity-meta-body,
+        .app-shell.is-screenshot-demo .activity-command-detail,
+        .app-shell.is-screenshot-demo .activity-shell {
+          width: 100%;
+        }
+
+        .app-shell.is-screenshot-demo .activity-command-detail summary {
+          max-width: 100%;
+          min-width: 0;
+        }
+
+        .app-shell.is-screenshot-demo .activity-command-detail summary span,
+        .app-shell.is-screenshot-demo .activity-meta-summary span,
+        .app-shell.is-screenshot-demo .activity-live span,
+        .app-shell.is-screenshot-demo .activity-markdown,
+        .app-shell.is-screenshot-demo .activity-meta-detail,
+        .app-shell.is-screenshot-demo .message-content,
+        .app-shell.is-screenshot-demo .message-content * {
+          display: block;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          overflow-wrap: anywhere;
+          word-break: break-all;
+        }
+
+        .app-shell.is-screenshot-demo .activity-command-detail summary span,
+        .app-shell.is-screenshot-demo .activity-meta-summary span,
+        .app-shell.is-screenshot-demo .activity-summary-title,
+        .app-shell.is-screenshot-demo .activity-text,
+        .app-shell.is-screenshot-demo .activity-text p,
+        .app-shell.is-screenshot-demo .activity-markdown p {
+          white-space: normal !important;
+        }
+
+        .app-shell.is-screenshot-demo .activity-shell pre,
+        .app-shell.is-screenshot-demo .activity-shell code,
+        .app-shell.is-screenshot-demo .message-content pre,
+        .app-shell.is-screenshot-demo .message-content code {
+          max-width: 100%;
+          overflow-x: hidden;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        .app-shell.is-screenshot-demo .activity-live {
+          display: flex;
+          width: 100%;
+          max-width: 100%;
+        }
+
+        .app-shell.is-screenshot-demo .activity-live span {
+          display: block;
+          width: 100%;
+          min-width: 0;
+          white-space: normal;
+          overflow-wrap: anywhere;
+          word-break: break-all;
+        }
+
+        .app-shell.is-screenshot-demo .composer-wrap {
+          padding-left: 14px;
+          padding-right: 18px;
+        }
+
+        .app-shell.is-screenshot-demo .composer-controls {
+          gap: 4px;
+          padding-right: 6px;
+        }
+
+        .app-shell.is-screenshot-demo .composer-tool-strip {
+          gap: 1px;
+          overflow: visible;
+          transform: scale(0.84);
+          transform-origin: right center;
+        }
+
+        .app-shell.is-screenshot-demo .composer-tool-icon,
+        .app-shell.is-screenshot-demo .composer-attach {
+          width: 31px;
+          height: 31px;
+        }
+
+        .app-shell.is-screenshot-demo .context-status-compact,
+        .app-shell.is-screenshot-demo .context-status-button {
+          width: 27px;
+          min-width: 27px;
+          padding: 0;
+        }
+
+        .app-shell.is-screenshot-demo .model-chip {
+          max-width: 64px;
+          padding-left: 3px;
+          padding-right: 1px;
+        }
+
+        .app-shell.is-screenshot-demo .send-button {
+          width: 36px;
+          height: 36px;
+          min-width: 36px;
+        }
+
+        .app-shell.is-screenshot-demo .top-bar {
+          max-width: 100vw;
+          overflow: hidden;
+        }
+      `}
+    </style>
+  );
 }
 
 export default function DemoScreenshotApp() {
@@ -616,13 +776,16 @@ export default function DemoScreenshotApp() {
 
   const context = { scene, theme };
   return (
-    <AppShell
-      shellClass={shellClass(scene)}
-      panelProps={basePanelProps(context)}
-      drawerProps={drawerProps(context)}
-      chatProps={chatProps(context)}
-      composerProps={composerProps(context)}
-      homeVisible={false}
-    />
+    <>
+      <ScreenshotViewportGuard />
+      <AppShell
+        shellClass={shellClass(scene)}
+        panelProps={basePanelProps(context)}
+        drawerProps={drawerProps(context)}
+        chatProps={chatProps(context)}
+        composerProps={composerProps(context)}
+        homeVisible={false}
+      />
+    </>
   );
 }

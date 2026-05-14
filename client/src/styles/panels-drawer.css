@@ -1909,6 +1909,46 @@ button.settings-row.is-actionable:active {
   line-height: 17px;
 }
 
+.archive-search {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 8px 0 14px;
+  padding: 0 12px;
+  border: 1px solid var(--subpage-line);
+  border-radius: 8px;
+  color: var(--subpage-muted);
+  background: var(--subpage-card-strong);
+}
+
+[data-theme="dark"] .archive-search {
+  background: var(--subpage-card);
+}
+
+.archive-search svg {
+  flex: 0 0 auto;
+}
+
+.archive-search input {
+  min-width: 0;
+  flex: 1;
+  height: 40px;
+  border: 0;
+  outline: 0;
+  color: var(--subpage-text);
+  background: transparent;
+  font-size: 16px;
+  line-height: 22px;
+  letter-spacing: 0;
+}
+
+.archive-search input::placeholder {
+  color: var(--subpage-muted);
+  opacity: 0.78;
+}
+
 .archive-refresh-cta {
   display: inline-flex;
   align-items: center;

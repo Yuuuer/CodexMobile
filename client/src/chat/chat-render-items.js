@@ -83,7 +83,7 @@ export function chatRenderItems(messages = [], { running = false } = {}) {
   };
 
   const flushFileSummaries = (message, item) => {
-    for (const key of resultKeysForMessage(message)) {
+    for (const key of pendingResultKeysForMessage(message, pendingByTurn)) {
       const pending = pendingByTurn.get(key);
       if (!pending?.length) {
         continue;
@@ -102,6 +102,17 @@ export function chatRenderItems(messages = [], { running = false } = {}) {
       key: pendingActivityMessage.id || `${items.length}`,
       message: pendingActivityMessage
     };
+    const assistantIndex = matchingAssistantItemIndex(items, pendingActivityMessage);
+    if (assistantIndex >= 0) {
+      items.splice(assistantIndex, 0, item);
+      const summary = fileSummaryForActivityMessage(pendingActivityMessage);
+      if (summary) {
+        const assistantItem = items[assistantIndex + 1];
+        assistantItem.fileSummaries = [...(assistantItem.fileSummaries || []), summary];
+      }
+      pendingActivityMessage = null;
+      return;
+    }
     items.push(item);
     queueFileSummary(pendingActivityMessage);
     pendingActivityMessage = null;
@@ -177,6 +188,40 @@ function resultKeysForMessage(message = {}) {
   }
   const segmentIndex = numericSegmentIndex(message.segmentIndex);
   return segmentIndex === null ? [`${turnId}:0`] : [`${turnId}:${segmentIndex}`, `${turnId}:0`];
+}
+
+function pendingResultKeysForMessage(message = {}, pendingByTurn = new Map()) {
+  const keys = resultKeysForMessage(message);
+  const turnId = String(message.turnId || '').trim();
+  if (message?.role === 'assistant' && turnId && numericSegmentIndex(message.segmentIndex) === null) {
+    for (const key of pendingByTurn.keys()) {
+      if (key.startsWith(`${turnId}:`)) {
+        keys.push(key);
+      }
+    }
+  }
+  return [...new Set(keys)];
+}
+
+function matchingAssistantItemIndex(items = [], activityMessage = {}) {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item?.type === 'message' && item.message?.role === 'assistant' && messagesShareResultTurn(activityMessage, item.message)) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function messagesShareResultTurn(left = {}, right = {}) {
+  const leftTurnId = String(left.turnId || '').trim();
+  const rightTurnId = String(right.turnId || '').trim();
+  if (!leftTurnId || leftTurnId !== rightTurnId) {
+    return false;
+  }
+  const leftSegment = numericSegmentIndex(left.segmentIndex);
+  const rightSegment = numericSegmentIndex(right.segmentIndex);
+  return leftSegment === null || rightSegment === null || leftSegment === rightSegment;
 }
 
 function numericSegmentIndex(value) {

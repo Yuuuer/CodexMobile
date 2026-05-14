@@ -11,7 +11,7 @@
  * Outward: Drawer 在 settings 子视图中渲染。
  */
 
-import { Archive, Bug, ChevronLeft, ChevronRight, Info, LogOut, MonitorCog, Moon, RefreshCw, ShieldCheck, Smartphone, Sun, Trash2, X } from 'lucide-react';
+import { Archive, Bug, ChevronLeft, ChevronRight, Info, LogOut, MonitorCog, Moon, RefreshCw, ShieldCheck, Smartphone, Sun, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../api.js';
 import { deviceMetaText, deviceStatusText, sortDevicesForDisplay } from '../security-devices.js';
@@ -104,9 +104,6 @@ export function DrawerSettingsView({
           <strong>设置</strong>
           <div className="drawer-subpage-actions">
             <span className="settings-version-text">v{appVersion}</span>
-            <button className="icon-button" onClick={onClose} aria-label="关闭菜单">
-              <X size={20} />
-            </button>
           </div>
         </div>
         <div className="drawer-subpage-content settings-view">

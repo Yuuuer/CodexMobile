@@ -1,7 +1,7 @@
 /**
- * 归档箱抽屉子页：以桌面端列表风格展示已归档线程，并提供只读查看与取消归档。
+ * 归档箱抽屉子页：以桌面端列表风格展示和搜索已归档线程，并提供只读查看与取消归档。
  *
- * Keywords: drawer, archive, sessions, settings, desktop-sync
+ * Keywords: drawer, archive, sessions, search, settings, desktop-sync
  *
  * Exports:
  * - DrawerArchiveView — 归档箱视图组件。
@@ -11,7 +11,8 @@
  * Outward: Drawer 在 archive 子视图中渲染。
  */
 
-import { AlertCircle, ChevronLeft, Clock3, Folder, Inbox, MessageSquare, RefreshCw } from 'lucide-react';
+import { AlertCircle, ChevronLeft, Clock3, Folder, Inbox, MessageSquare, RefreshCw, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { compactPath, formatTime } from '../app/session-utils.js';
 
 export function DrawerArchiveView({
@@ -29,10 +30,23 @@ export function DrawerArchiveView({
   onUnarchiveSession,
   unarchivingSessionIds = {}
 }) {
-  const archiveCount = archivedSessions.length;
+  const [archiveQuery, setArchiveQuery] = useState('');
+  const sourceSessions = Array.isArray(archivedSessions) ? archivedSessions : [];
+  const normalizedArchiveQuery = archiveQuery.trim().toLowerCase();
+  const filteredSessions = useMemo(() => {
+    if (!normalizedArchiveQuery) {
+      return sourceSessions;
+    }
+    return sourceSessions.filter((session) => archiveSessionSearchText(session).includes(normalizedArchiveQuery));
+  }, [sourceSessions, normalizedArchiveQuery]);
+  const archiveCount = sourceSessions.length;
+  const filteredCount = filteredSessions.length;
   const archiveSyncLabel = archiveSyncedAt
     ? `${archiveSource === 'local' ? '本地兜底' : '桌面同步'} · ${formatTime(archiveSyncedAt)}`
     : '等待同步';
+  const archiveCountText = normalizedArchiveQuery
+    ? `${filteredCount}/${archiveCount} 个匹配`
+    : archiveCount ? `${archiveCount} 个对话` : '暂无对话';
 
   return (
     <>
@@ -50,7 +64,7 @@ export function DrawerArchiveView({
           <section className="archive-toolbar" aria-label="归档概览">
             <div>
               <h2>已归档对话</h2>
-              <p>{archiveCount ? `${archiveCount} 个对话` : '暂无对话'} · {archiveSyncLabel}</p>
+              <p>{archiveCountText} · {archiveSyncLabel}</p>
             </div>
             <button type="button" className="archive-refresh-cta" onClick={onRefresh} disabled={archiveLoading} aria-label="刷新归档对话">
               <RefreshCw size={15} className={archiveLoading ? 'spin' : ''} />
@@ -58,8 +72,21 @@ export function DrawerArchiveView({
             </button>
           </section>
 
+          <label className="archive-search" aria-label="搜索已归档对话">
+            <Search size={15} />
+            <input
+              type="search"
+              inputMode="search"
+              autoCapitalize="off"
+              autoCorrect="off"
+              placeholder="搜索标题、摘要或项目路径"
+              value={archiveQuery}
+              onChange={(event) => setArchiveQuery(event.target.value)}
+            />
+          </label>
+
           <section className="archive-list-panel" aria-label="归档线程列表">
-            {archiveLoading && !archivedSessions.length ? (
+            {archiveLoading && !sourceSessions.length ? (
               <div className="archive-empty-state">
                 <RefreshCw size={18} className="spin" />
                 <span>正在同步归档对话</span>
@@ -71,15 +98,21 @@ export function DrawerArchiveView({
                 <span>同步失败，点击重试</span>
               </button>
             ) : null}
-            {!archiveLoading && !archiveError && archiveLoaded && !archivedSessions.length ? (
+            {!archiveLoading && !archiveError && archiveLoaded && !sourceSessions.length ? (
               <div className="archive-empty-state">
                 <Inbox size={18} />
                 <span>暂无已归档对话</span>
               </div>
             ) : null}
-            {archivedSessions.length ? (
+            {!archiveLoading && !archiveError && archiveLoaded && sourceSessions.length > 0 && !filteredSessions.length ? (
+              <div className="archive-empty-state">
+                <Search size={18} />
+                <span>没有匹配的归档对话</span>
+              </div>
+            ) : null}
+            {filteredSessions.length ? (
               <div className="archive-list">
-                {archivedSessions.map((session) => {
+                {filteredSessions.map((session) => {
                   const unarchiving = Boolean(unarchivingSessionIds[session.id]);
                   return (
                     <div key={session.id} className="archive-thread-row">
@@ -137,4 +170,16 @@ export function DrawerArchiveView({
       </aside>
     </>
   );
+}
+
+function archiveSessionSearchText(session = {}) {
+  return [
+    session.title,
+    session.summary,
+    session.projectName,
+    session.projectPath,
+    session.path,
+    session.id,
+    compactPath(session.projectPath || '')
+  ].filter(Boolean).join(' ').toLowerCase();
 }

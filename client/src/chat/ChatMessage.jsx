@@ -1,7 +1,7 @@
 /**
- * 单条聊天消息壳层：用户/助手复制、结果尾部内容、活动气泡、计划消息与图片条分发。
+ * 单条聊天消息壳层：用户/助手复制、结果尾部内容、活动气泡、计划消息与图片条分发，并稳定普通消息重渲染。
  *
- * Keywords: ChatMessage, copy, plan, activity
+ * Keywords: ChatMessage, copy, plan, activity, memo
  *
  * Exports:
  * - ChatMessage — 按 role 路由到 ActivityMessage、PlanMessage 或标准气泡。
@@ -12,7 +12,7 @@
  */
 
 import { Check, Copy, CornerDownRight, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { formatTime } from '../app/session-utils.js';
 import { copyTextToClipboard } from '../utils/clipboard.js';
 import { ActivityMessage } from './ActivityMessage.jsx';
@@ -20,7 +20,7 @@ import { MessageContent, splitMessageImages } from './MarkdownContent.jsx';
 import { PlanMessage } from './PlanMessage.jsx';
 import { UserImageStrip } from './ImagePreview.jsx';
 
-export function ChatMessage({
+function ChatMessageView({
   message,
   now,
   onPreviewImage,
@@ -111,6 +111,30 @@ export function ChatMessage({
     </div>
   );
 }
+
+function chatMessagePropsEqual(previous, next) {
+  if (previous.message !== next.message) {
+    return false;
+  }
+  if (previous.afterContent !== next.afterContent) {
+    return false;
+  }
+  if (
+    previous.onPreviewImage !== next.onPreviewImage ||
+    previous.onDeleteMessage !== next.onDeleteMessage ||
+    previous.onImplementPlan !== next.onImplementPlan ||
+    previous.onAdjustPlan !== next.onAdjustPlan
+  ) {
+    return false;
+  }
+  const role = previous.message?.role || '';
+  if (role === 'activity' || role === 'plan' || role === 'plan_request') {
+    return previous.now === next.now;
+  }
+  return true;
+}
+
+export const ChatMessage = memo(ChatMessageView, chatMessagePropsEqual);
 
 function deliveryStatusText(message) {
   if (message.deliveryState === 'pending') {
