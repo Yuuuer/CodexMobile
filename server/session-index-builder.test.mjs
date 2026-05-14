@@ -8,10 +8,14 @@
  * Inward: session-index-builder.js
  */
 import assert from 'node:assert/strict';
+import fsSync from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {
   PROJECTLESS_PROJECT_ID,
   buildSessionIndex,
+  canonicalResolvedPath,
   projectIdFor
 } from './session-index-builder.js';
 
@@ -188,6 +192,95 @@ test('session index builder preserves project ordering, projectless sessions, hi
     ['/tmp/plain.jsonl', 'plain-1'],
     [undefined, 'hidden-1']
   ]);
+});
+
+test('session index builder treats symlinked project paths as the same project', async () => {
+  const tempRoot = fsSync.mkdtempSync(path.join(os.tmpdir(), 'codexmobile-path-alias-'));
+  const realRoot = path.join(tempRoot, 'Code');
+  const aliasRoot = path.join(tempRoot, '编程项目');
+  const realProject = path.join(realRoot, 'CodexMobile');
+  const aliasProject = path.join(aliasRoot, 'CodexMobile');
+  fsSync.mkdirSync(realProject, { recursive: true });
+  fsSync.symlinkSync(realRoot, aliasRoot, 'dir');
+  const expectedRealProject = fsSync.realpathSync.native(realProject);
+
+  try {
+    assert.equal(canonicalResolvedPath(aliasProject), expectedRealProject);
+    assert.equal(projectIdFor(aliasProject), projectIdFor(realProject));
+
+    const projectId = projectIdFor(aliasProject);
+    const index = await buildSessionIndex({
+      config: { projects: [{ path: aliasProject, trustLevel: 'trusted' }], context: {} },
+      workspaceState: { projects: [{ path: aliasProject, label: 'CodexMobile' }] },
+      mobileSessionIndex: new Map(),
+      hiddenSessionIds: new Set(),
+      desktopThreads: [
+        {
+          id: 'thread-after-rename',
+          cwd: realProject,
+          name: '路径迁移后的线程',
+          updatedAt: 1_800_000_000,
+          source: 'vscode'
+        }
+      ],
+      pathExists: fsSync.existsSync
+    });
+
+    assert.equal(index.projectById.get(projectId).path, expectedRealProject);
+    assert.equal(index.sessionsByProject.get(projectId).length, 1);
+    assert.equal(index.sessionsByProject.get(projectId)[0].cwd, expectedRealProject);
+  } finally {
+    fsSync.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('session index builder accepts seconds, milliseconds, and ISO thread times', async () => {
+  const projectRoot = '/tmp/codexmobile-time-project';
+  const projectId = projectIdFor(projectRoot);
+  const index = await buildSessionIndex({
+    config: { projects: [{ path: projectRoot, trustLevel: 'trusted' }], context: {} },
+    workspaceState: { projects: [{ path: projectRoot, label: 'Time Project' }] },
+    mobileSessionIndex: new Map(),
+    hiddenSessionIds: new Set(),
+    desktopThreads: [
+      {
+        id: 'seconds-thread',
+        cwd: projectRoot,
+        name: 'seconds',
+        updatedAt: 1_778_794_800,
+        path: '/tmp/seconds.jsonl',
+        source: 'vscode'
+      },
+      {
+        id: 'millis-thread',
+        cwd: projectRoot,
+        name: 'millis',
+        updatedAt: 1_778_794_860_000,
+        path: '/tmp/millis.jsonl',
+        source: 'vscode'
+      },
+      {
+        id: 'iso-thread',
+        cwd: projectRoot,
+        name: 'iso',
+        updatedAt: '2026-05-14T21:42:00.000Z',
+        path: '/tmp/iso.jsonl',
+        source: 'vscode'
+      }
+    ],
+    readRolloutContextState: async () => ({}),
+    pathExists: () => true,
+    homeDir: () => '/tmp/home'
+  });
+
+  assert.deepEqual(index.sessionsByProject.get(projectId).map((session) => session.id), [
+    'iso-thread',
+    'millis-thread',
+    'seconds-thread'
+  ]);
+  assert.equal(index.sessionById.get('seconds-thread').updatedAt, '2026-05-14T21:40:00.000Z');
+  assert.equal(index.sessionById.get('millis-thread').updatedAt, '2026-05-14T21:41:00.000Z');
+  assert.equal(index.sessionById.get('iso-thread').updatedAt, '2026-05-14T21:42:00.000Z');
 });
 
 test('session index builder keeps unknown cwd and projectless subagents out of normal conversations', async () => {

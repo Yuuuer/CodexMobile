@@ -15,38 +15,11 @@ import { Archive, BarChart3, Check, ChevronDown, Folder, Loader2, MessageSquare,
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../api.js';
 import { setClientRuntimeDebugEnabled } from '../app/runtime-debug-client.js';
-import { compactPath, formatTime, sessionRunBadgeState, subAgentSubtitle } from '../app/session-utils.js';
+import { compactPath, formatRelativeShort, sessionRunBadgeState, subAgentSubtitle } from '../app/session-utils.js';
 import { DrawerArchiveView } from './DrawerArchiveView.jsx';
 import { DrawerQuotaPanel } from './DrawerQuotaPanel.jsx';
 import { DrawerSettingsView } from './DrawerSettingsView.jsx';
 import { SidebarToggleIcon } from './TopBar.jsx';
-
-function formatRelativeShort(value) {
-  if (!value) {
-    return '';
-  }
-  const ts = new Date(value).getTime();
-  if (!Number.isFinite(ts)) {
-    return '';
-  }
-  const diff = Date.now() - ts;
-  if (diff < 60_000) {
-    return '刚刚';
-  }
-  if (diff < 3_600_000) {
-    return `${Math.floor(diff / 60_000)} 分钟`;
-  }
-  if (diff < 86_400_000) {
-    return `${Math.floor(diff / 3_600_000)} 小时`;
-  }
-  if (diff < 7 * 86_400_000) {
-    return `${Math.floor(diff / 86_400_000)} 天`;
-  }
-  if (diff < 30 * 86_400_000) {
-    return `${Math.floor(diff / (7 * 86_400_000))} 周`;
-  }
-  return formatTime(value);
-}
 
 function projectSourceLabel(project) {
   if (!project || project.projectless) {

@@ -11,6 +11,7 @@ import { appReducer, createInitialUiState } from './app/AppState.js';
 import { applyPwaTheme } from './app/pwa-theme.js';
 import {
   createDraftSession,
+  formatRelativeShort,
   localFileApiPath,
   localFilePreviewPath,
   messagePageFromResponse,
@@ -94,6 +95,15 @@ test('applyPwaTheme resolves system preference from media query', () => {
   assert.equal(meta.preference, 'system');
   assert.equal(meta.resolvedTheme, 'dark');
   assert.equal(elements.get('meta[data-app-theme-color]').content, '#000000');
+});
+
+test('formatRelativeShort keeps sidebar time stable around now and future clock skew', () => {
+  const now = '2026-05-15T05:30:00+08:00';
+
+  assert.equal(formatRelativeShort('2026-05-15T05:29:35+08:00', now), '刚刚');
+  assert.equal(formatRelativeShort('2026-05-15T05:18:00+08:00', now), '12 分钟');
+  assert.equal(formatRelativeShort('2026-05-15T02:30:00+08:00', now), '3 小时');
+  assert.match(formatRelativeShort('2026-05-15T06:40:00+08:00', now), /05\/15.*06:40|15\/05.*06:40/);
 });
 
 test('selected desktop activity does not count as composer runtime without live sync state', () => {

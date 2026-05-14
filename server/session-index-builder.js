@@ -5,7 +5,7 @@
  *
  * Exports:
  * - PROJECTLESS_PROJECT_ID / PROJECTLESS_PROJECT_NAME — 无项目会话占位。
- * - normalizeComparablePath — 路径规范化比对。
+ * - canonicalResolvedPath / normalizeComparablePath — 路径规范化与比对。
  * - projectIdFor — 由路径生成项目 id。
  * - buildSessionIndex — 扫描并产出索引快照。
  *
@@ -20,7 +20,6 @@ import fsSync from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  isoFromEpochSeconds,
   publicContextState,
   publicRuntimeState
 } from './session-message-reader.js';
@@ -39,8 +38,20 @@ export function normalizeComparablePath(value) {
   if (!value || typeof value !== 'string') {
     return '';
   }
-  const normalized = path.resolve(value);
+  const normalized = canonicalResolvedPath(value);
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+export function canonicalResolvedPath(value) {
+  if (!value || typeof value !== 'string') {
+    return '';
+  }
+  const resolved = path.resolve(value);
+  try {
+    return fsSync.realpathSync.native(resolved);
+  } catch {
+    return resolved;
+  }
 }
 
 export function projectIdFor(projectPath) {
@@ -170,6 +181,27 @@ function shouldHideSubAgentFromProjectless(session = null) {
   return Boolean(session?.projectless && (session?.isSubAgent || session?.parentSessionId || session?.subAgent));
 }
 
+function isoFromThreadTime(value) {
+  if (!value) {
+    return null;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const millis = value > 10_000_000_000 ? value : value * 1000;
+    const date = new Date(millis);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+  const text = String(value || '').trim();
+  if (!text) {
+    return null;
+  }
+  const numeric = Number(text);
+  if (Number.isFinite(numeric)) {
+    return isoFromThreadTime(numeric);
+  }
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 function desktopThreadRuntime(thread, contextState = {}) {
   const runtime = publicRuntimeState(contextState.runtime, thread?.id);
   if (runtime) {
@@ -188,8 +220,8 @@ function desktopThreadRuntime(thread, contextState = {}) {
     source: 'desktop-thread',
     sessionId: thread.id,
     turnId: thread.turnId || null,
-    startedAt: isoFromEpochSeconds(thread.startedAt) || null,
-    updatedAt: isoFromEpochSeconds(thread.updatedAt) || new Date().toISOString(),
+    startedAt: isoFromThreadTime(thread.startedAt) || null,
+    updatedAt: isoFromThreadTime(thread.updatedAt) || new Date().toISOString(),
     steerable: false
   };
 }
@@ -217,7 +249,7 @@ async function sessionFromDesktopThread({
   if (!cwd && !explicitProjectless) {
     return null;
   }
-  const resolvedCwd = path.resolve(cwd || projectlessWorkdir);
+  const resolvedCwd = canonicalResolvedPath(cwd || projectlessWorkdir);
   const projectId = projectIdFor(resolvedCwd);
   const projectless =
     explicitProjectless ||
@@ -243,7 +275,7 @@ async function sessionFromDesktopThread({
     reasoningEffort: thread.reasoningEffort || mobileSession?.reasoningEffort || null,
     provider: thread.modelProvider || mobileSession?.provider || null,
     messageCount: mobileMessages.length,
-    updatedAt: isoFromEpochSeconds(thread.updatedAt) || mobileSession?.updatedAt || null,
+    updatedAt: isoFromThreadTime(thread.updatedAt) || mobileSession?.updatedAt || null,
     source: sourceToString(thread.source),
     parentSessionId: subAgentMeta.parentSessionId,
     isSubAgent: Boolean(subAgentMeta.parentSessionId || subAgentMeta.subAgent),
@@ -278,7 +310,7 @@ function projectlessWorkingDirectory(workspaceState, { homeDir, pathExists }) {
     if (!projectlessIds.has(threadId) || typeof root !== 'string' || !root.trim()) {
       continue;
     }
-    const resolved = path.resolve(root);
+    const resolved = canonicalResolvedPath(root);
     counts.set(resolved, (counts.get(resolved) || 0) + 1);
   }
   const [mostUsedHint] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || [];
@@ -329,7 +361,7 @@ function upsertProject(projectMap, projectPath, trustLevel = null, label = null)
   const entry = {
     id,
     name: label || displayNameFor(projectPath),
-    path: path.resolve(projectPath),
+    path: normalized,
     trusted: trustLevel === 'trusted',
     updatedAt: null,
     sessionCount: 0

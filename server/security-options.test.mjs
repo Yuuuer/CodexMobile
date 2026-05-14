@@ -1,7 +1,7 @@
 /**
- * 测试 server/security-options.js：环境变量、安全来源、私网 CIDR 与代理地址判断。
+ * 测试 server/security-options.js：环境变量、安全来源、私网 CIDR、完全访问默认值与代理地址判断。
  *
- * Keywords: security-options, cidr, origin, proxy, test
+ * Keywords: security-options, cidr, origin, proxy, danger-full-access, test
  *
  * Exports: 无导出，内含用例
  *
@@ -37,7 +37,22 @@ test('isPrivateRemoteAddress recognizes LAN, loopback, and Tailscale CGNAT', () 
   assert.equal(isPrivateRemoteAddress('203.0.113.9'), false);
 });
 
-test('readSecurityOptions exposes safe defaults and explicit origins', () => {
+test('readSecurityOptions keeps danger full access available for private bridge by default', () => {
+  const options = readSecurityOptions({});
+  assert.equal(options.publicAccess, false);
+  assert.equal(options.dangerFullAccessEnabled, true);
+});
+
+test('readSecurityOptions disables danger full access for public access unless explicitly enabled', () => {
+  assert.equal(readSecurityOptions({ CODEXMOBILE_PUBLIC_ACCESS: '1' }).dangerFullAccessEnabled, false);
+  assert.equal(readSecurityOptions({
+    CODEXMOBILE_PUBLIC_ACCESS: '1',
+    CODEXMOBILE_ENABLE_DANGER_FULL_ACCESS: '1'
+  }).dangerFullAccessEnabled, true);
+  assert.equal(readSecurityOptions({ CODEXMOBILE_ENABLE_DANGER_FULL_ACCESS: '0' }).dangerFullAccessEnabled, false);
+});
+
+test('readSecurityOptions exposes safe origins and explicit origins', () => {
   const options = readSecurityOptions({
     CODEXMOBILE_PUBLIC_URL: 'https://codex.example.com/mobile',
     CODEXMOBILE_ALLOWED_ORIGINS: 'https://extra.example.com',
@@ -45,7 +60,7 @@ test('readSecurityOptions exposes safe defaults and explicit origins', () => {
   });
   assert.equal(options.publicAccess, false);
   assert.equal(options.allowRemotePairing, false);
-  assert.equal(options.dangerFullAccessEnabled, false);
+  assert.equal(options.dangerFullAccessEnabled, true);
   assert.equal(options.legacyBearerEnabled, true);
   assert.equal(isPrivateRemoteAddress('198.51.100.7', options), true);
   assert.equal(sameOriginAllowed('https://codex.example.com', options), true);

@@ -4,7 +4,7 @@
  * Keywords: session-utils, draft-session, thread-runtime, running-activity, media
  *
  * Exports:
- * - 通用与展示 — `formatTime`、`formatDuration*`、`subAgentRoleLabel`、`compactPath`、`safeStoredJsonArray` 等。
+ * - 通用与展示 — `formatTime`、`formatRelativeShort`、`formatDuration*`、`subAgentRoleLabel`、`compactPath`、`safeStoredJsonArray` 等。
  * - 上下文与媒体 — `emptyContextStatus`、`imageUrlWithRetry`、`sourceMediaKind`、本地源与 `local*ApiPath`、`dataImageObjectUrl`、`useResolvedImageSource`。
  * - 会话生命周期 — `createClientTurnId`、`createDraftSession`、`resolveNewConversationProject`、`resolveComposerGitProject`、`isDraftSession`、`sessionMessagesApiPath`、标题补丁、`upsertSessionInProject`。
  * - Runtime — `payloadRunKeys`、`selectedRunKeys`、`reconcileThreadRuntimeWithSessions`、`is*Runtime`、`runningByIdWithSelectedActivity`、`sessionRunBadgeState`、`selectedSessionIsRunning`、`hasVisibleAssistantForTurn` 等。
@@ -87,6 +87,37 @@ export function formatTime(value) {
   } catch {
     return '';
   }
+}
+
+export function formatRelativeShort(value, now = Date.now()) {
+  if (!value) {
+    return '';
+  }
+  const ts = new Date(value).getTime();
+  const nowMs = new Date(now).getTime();
+  if (!Number.isFinite(ts) || !Number.isFinite(nowMs)) {
+    return '';
+  }
+  const diff = nowMs - ts;
+  if (Math.abs(diff) < 60_000) {
+    return '刚刚';
+  }
+  if (diff < 0) {
+    return formatTime(value);
+  }
+  if (diff < 3_600_000) {
+    return `${Math.floor(diff / 60_000)} 分钟`;
+  }
+  if (diff < 86_400_000) {
+    return `${Math.floor(diff / 3_600_000)} 小时`;
+  }
+  if (diff < 7 * 86_400_000) {
+    return `${Math.floor(diff / 86_400_000)} 天`;
+  }
+  if (diff < 30 * 86_400_000) {
+    return `${Math.floor(diff / (7 * 86_400_000))} 周`;
+  }
+  return formatTime(value);
 }
 
 export function subAgentRoleLabel(role) {

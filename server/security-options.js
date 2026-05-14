@@ -1,12 +1,12 @@
 /**
  * 读取 CodexMobile 安全配置，并提供私网、代理、来源与传输安全判断。
  *
- * Keywords: security-options, private-network, origin, cidr, proxy
+ * Keywords: security-options, private-network, origin, cidr, proxy, danger-full-access
  *
  * Exports:
  * - envFlag / readIntEnv — 环境变量解析辅助。
  * - normalizeRemoteAddress / cidrMatches / addressInCidrs / isPrivateRemoteAddress — 地址判断工具。
- * - parseOrigins / readSecurityOptions / sameOriginAllowed — Origin 与安全配置读取。
+ * - parseOrigins / readSecurityOptions / sameOriginAllowed — Origin 与权限安全配置读取。
  * - isTrustedProxy / clientRemoteAddress / isRequestTransportSecure / requestMayUsePublicHttp — 请求来源判断。
  *
  * Inward（本模块依赖/组装的关键符号）: Node net、process.env。
@@ -98,8 +98,13 @@ export function readSecurityOptions(env = process.env) {
   const publicOrigin = publicUrl ? new URL(publicUrl).origin : '';
   const legacyBearerEnabled = envFlag(env, 'CODEXMOBILE_ALLOW_LEGACY_BEARER') ||
     String(env.CODEXMOBILE_ALLOW_LEGACY_BEARER || '').trim() === '';
+  const publicAccess = envFlag(env, 'CODEXMOBILE_PUBLIC_ACCESS');
+  const explicitDangerFullAccess = String(env.CODEXMOBILE_ENABLE_DANGER_FULL_ACCESS || '').trim();
+  const dangerFullAccessEnabled = explicitDangerFullAccess
+    ? envFlag(env, 'CODEXMOBILE_ENABLE_DANGER_FULL_ACCESS')
+    : !publicAccess;
   return {
-    publicAccess: envFlag(env, 'CODEXMOBILE_PUBLIC_ACCESS'),
+    publicAccess,
     publicUrl,
     publicOrigin,
     allowedOrigins: [...new Set([publicOrigin, ...parseOrigins(env.CODEXMOBILE_ALLOWED_ORIGINS)].filter(Boolean))],
@@ -107,7 +112,7 @@ export function readSecurityOptions(env = process.env) {
     privateCidrs: String(env.CODEXMOBILE_PRIVATE_CIDRS || '').split(',').map((item) => item.trim()).filter(Boolean),
     allowRemotePairing: envFlag(env, 'CODEXMOBILE_ALLOW_REMOTE_PAIRING'),
     legacyBearerEnabled,
-    dangerFullAccessEnabled: envFlag(env, 'CODEXMOBILE_ENABLE_DANGER_FULL_ACCESS'),
+    dangerFullAccessEnabled,
     pairingCodeLength: readIntEnv(env, 'CODEXMOBILE_PAIRING_CODE_LENGTH', 10),
     pairingCodeTtlMs: readIntEnv(env, 'CODEXMOBILE_PAIRING_CODE_TTL_MS', 10 * 60 * 1000),
     pairingRequestCooldownMs: readIntEnv(env, 'CODEXMOBILE_PAIRING_REQUEST_COOLDOWN_MS', 30 * 1000),
