@@ -13,12 +13,15 @@ import {
   createDraftSession,
   localFileApiPath,
   localFilePreviewPath,
+  messagePageFromResponse,
   payloadRunKeys,
+  prependUniqueMessages,
   reconcileThreadRuntimeWithSessions,
   resolveComposerGitProject,
   resolveNewConversationProject,
   runningByIdWithSelectedActivity,
   selectedSessionIsRunning,
+  sessionMessagesApiPath,
   sessionRunBadgeState,
   titleFromFirstMessage
 } from './app/session-utils.js';
@@ -338,16 +341,36 @@ test('viewportSizingMetrics exposes keyboard inset from visual viewport', () => 
   assert.equal(metrics.height, 520);
 });
 
-test('localFileApiPath can include token for direct browser navigation', () => {
+test('localFileApiPath uses Cookie auth and does not include token query parameters', () => {
   assert.equal(
     localFileApiPath('/Users/demo/report.md', 'secret token'),
-    '/api/local-file?path=%2FUsers%2Fdemo%2Freport.md&token=secret%20token'
+    '/api/local-file?path=%2FUsers%2Fdemo%2Freport.md'
   );
 });
 
 test('localFilePreviewPath routes local files through the mobile preview page', () => {
   assert.equal(
     localFilePreviewPath('/Users/demo/report.md', 'secret token'),
-    '/preview/file?path=%2FUsers%2Fdemo%2Freport.md&token=secret+token'
+    '/preview/file?path=%2FUsers%2Fdemo%2Freport.md'
+  );
+});
+
+test('sessionMessagesApiPath supports older-page pagination params', () => {
+  assert.equal(
+    sessionMessagesApiPath('session 1', { limit: 40, offset: 80, latest: false }),
+    '/api/sessions/session%201/messages?limit=40&offset=80&latest=0&activity=1'
+  );
+});
+
+test('message page helpers preserve pagination and prepend older messages once', () => {
+  assert.deepEqual(messagePageFromResponse({ offset: 80, total: 200, hasMoreBefore: true }), {
+    offset: 80,
+    total: 200,
+    hasMoreBefore: true,
+    loadingOlder: false
+  });
+  assert.deepEqual(
+    prependUniqueMessages([{ id: 'm2' }, { id: 'm3' }], [{ id: 'm1' }, { id: 'm2' }]).map((message) => message.id),
+    ['m1', 'm2', 'm3']
   );
 });

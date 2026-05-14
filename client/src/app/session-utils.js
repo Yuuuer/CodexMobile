@@ -37,6 +37,41 @@ const EMPTY_CONTEXT_FALLBACK = {
     reason: ''
   }
 };
+export const SESSION_MESSAGES_PAGE_SIZE = 120;
+
+export function emptyMessagePage() {
+  return {
+    offset: 0,
+    total: 0,
+    hasMoreBefore: false,
+    loadingOlder: false
+  };
+}
+
+export function messagePageFromResponse(data = {}) {
+  return {
+    offset: Number.isFinite(Number(data.offset)) ? Number(data.offset) : 0,
+    total: Number.isFinite(Number(data.total)) ? Number(data.total) : 0,
+    hasMoreBefore: Boolean(data.hasMoreBefore),
+    loadingOlder: false
+  };
+}
+
+export function prependUniqueMessages(current = [], older = []) {
+  const seen = new Set((Array.isArray(current) ? current : []).map((message) => String(message?.id || '')).filter(Boolean));
+  const additions = (Array.isArray(older) ? older : []).filter((message) => {
+    const id = String(message?.id || '').trim();
+    if (!id) {
+      return true;
+    }
+    if (seen.has(id)) {
+      return false;
+    }
+    seen.add(id);
+    return true;
+  });
+  return [...additions, ...(Array.isArray(current) ? current : [])];
+}
 
 export function formatTime(value) {
   if (!value) {
@@ -181,23 +216,17 @@ export function localImageApiPath(value) {
   return `/api/local-image?path=${encodeURIComponent(normalized)}`;
 }
 
-export function localFileApiPath(value, token = '') {
+export function localFileApiPath(value) {
   const raw = String(value || '').trim();
   const normalized = /%[0-9a-f]{2}/i.test(raw) ? safeDecodeUriComponent(raw) : raw;
-  const tokenValue = String(token || '').trim();
-  const tokenParam = tokenValue ? `&token=${encodeURIComponent(tokenValue)}` : '';
-  return `/api/local-file?path=${encodeURIComponent(normalized)}${tokenParam}`;
+  return `/api/local-file?path=${encodeURIComponent(normalized)}`;
 }
 
-export function localFilePreviewPath(value, token = '') {
+export function localFilePreviewPath(value) {
   const raw = String(value || '').trim();
   const normalized = /%[0-9a-f]{2}/i.test(raw) ? safeDecodeUriComponent(raw) : raw;
   const params = new URLSearchParams();
   params.set('path', normalized);
-  const tokenValue = String(token || '').trim();
-  if (tokenValue) {
-    params.set('token', tokenValue);
-  }
   return `/preview/file?${params.toString()}`;
 }
 
@@ -332,9 +361,15 @@ export function isDraftSession(session) {
   return Boolean(session?.draft || id?.startsWith('draft-'));
 }
 
-export function sessionMessagesApiPath(sessionId, { limit = 120, activity = true } = {}) {
+export function sessionMessagesApiPath(sessionId, { limit = 120, activity = true, offset = null, latest = true } = {}) {
   const params = new URLSearchParams();
   params.set('limit', String(limit));
+  if (offset !== null && offset !== undefined) {
+    params.set('offset', String(offset));
+  }
+  if (!latest) {
+    params.set('latest', '0');
+  }
   if (activity) {
     params.set('activity', '1');
   }

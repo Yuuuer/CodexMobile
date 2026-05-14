@@ -11,6 +11,8 @@
     "start": "node server/index.js",
     "start:env": "node --env-file=.env server/index.js",
     "start:bg": "node scripts/start-server.mjs",
+    "up": "node scripts/up.mjs",
+    "pair": "node scripts/pair.mjs",
     "mac:autostart": "node scripts/install-macos-autostart.mjs",
     "mac:autostart:remove": "node scripts/install-macos-autostart.mjs --uninstall",
     "asr:start": "node scripts/start-asr.mjs",

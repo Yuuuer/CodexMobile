@@ -33,6 +33,54 @@ export function classifyUpload(mimeType) {
   return String(mimeType || '').startsWith('image/') ? 'image' : 'file';
 }
 
+export function sniffMimeType(buffer, fallback = 'application/octet-stream') {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 4) {
+    return fallback;
+  }
+  const hex = buffer.subarray(0, 8).toString('hex');
+  const ascii = buffer.subarray(0, 16).toString('latin1');
+  if (hex.startsWith('89504e47')) return 'image/png';
+  if (hex.startsWith('ffd8ff')) return 'image/jpeg';
+  if (ascii.startsWith('GIF87a') || ascii.startsWith('GIF89a')) return 'image/gif';
+  if (ascii.startsWith('%PDF-')) return 'application/pdf';
+  if (hex.startsWith('504b0304')) return 'application/zip';
+  return fallback;
+}
+
+export function normalizeUploadMimeType(mimeType, data) {
+  const declared = String(mimeType || 'application/octet-stream').split(';')[0].trim().toLowerCase() || 'application/octet-stream';
+  const sniffed = sniffMimeType(data, '');
+  if (!sniffed) {
+    return declared;
+  }
+  if (declared === sniffed) {
+    return declared;
+  }
+  if (declared.startsWith('image/') || sniffed.startsWith('image/')) {
+    return 'application/octet-stream';
+  }
+  if (declared === 'application/pdf' || sniffed === 'application/pdf') {
+    return declared === sniffed ? declared : 'application/octet-stream';
+  }
+  return declared;
+}
+
+export function isPathInsideRoot(filePath, rootPath) {
+  const resolvedFile = path.resolve(String(filePath || ''));
+  const resolvedRoot = path.resolve(String(rootPath || ''));
+  const relative = path.relative(resolvedRoot, resolvedFile);
+  return Boolean(resolvedRoot && relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+export function isUploadAttachmentPathAllowed(attachment = {}, uploadRoot = '') {
+  const filePath = String(attachment.path || '').trim();
+  const id = String(attachment.id || '').trim();
+  if (!filePath || !id || !uploadRoot || !path.isAbsolute(filePath) || !isPathInsideRoot(filePath, uploadRoot)) {
+    return false;
+  }
+  return path.basename(filePath).startsWith(`${id}-`);
+}
+
 export function parseMultipartFile(buffer, contentType, fieldName = 'file') {
   const boundary = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i)?.[1] || contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i)?.[2];
   if (!boundary) {
@@ -140,6 +188,7 @@ export async function saveUpload(req, {
 
   const body = await readBuffer(req, maxUploadBytes);
   const part = parseMultipartFile(body, contentType);
+  const mimeType = normalizeUploadMimeType(part.mimeType, part.data);
   const id = crypto.randomUUID();
   const dateFolder = new Date().toISOString().slice(0, 10);
   const filePath = path.join(uploadRoot, dateFolder, `${id}-${part.fileName}`);
@@ -151,17 +200,17 @@ export async function saveUpload(req, {
     id,
     name: part.fileName,
     size: part.data.length,
-    mimeType: part.mimeType,
+    mimeType,
     path: filePath,
-    kind: classifyUpload(part.mimeType)
+    kind: classifyUpload(mimeType)
   };
 }
 
-export function normalizeAttachments(value) {
+export function normalizeAttachments(value, { uploadRoot = '', strictUploadRoot = false } = {}) {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value
+  const normalized = value
     .filter((item) => item && typeof item.path === 'string' && item.path.trim())
     .map((item) => ({
       id: String(item.id || ''),
@@ -171,6 +220,17 @@ export function normalizeAttachments(value) {
       path: String(item.path),
       kind: item.kind === 'image' ? 'image' : 'file'
     }));
+  if (!strictUploadRoot) {
+    return normalized;
+  }
+  return normalized.filter((attachment) => {
+    if (isUploadAttachmentPathAllowed(attachment, uploadRoot)) {
+      return true;
+    }
+    const error = new Error('Invalid attachment path');
+    error.statusCode = 400;
+    throw error;
+  });
 }
 
 export function markdownImageDestination(value) {

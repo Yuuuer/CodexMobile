@@ -5,6 +5,7 @@
  *
  * Exports:
  * - 常量：PERMISSION_OPTIONS、DEFAULT_PERMISSION_MODE、MODEL_SPEED_OPTIONS、REASONING_OPTIONS、DEFAULT_MODEL_SPEED。
+ * - permissionOptionsForSecurity / normalizePermissionModeForSecurity — 按后端安全状态过滤权限。
  * - formatBytes、shortModelName、permissionLabel、reasoningLabel、normalizeModelSpeed、modelSpeedLabel、serviceTierForModelSpeed、selectedSkillSummary。
  *
  * Inward: 无外部模块，纯数据与字符串处理。
@@ -18,7 +19,7 @@ export const PERMISSION_OPTIONS = [
   { value: 'bypassPermissions', label: '完全访问', danger: true }
 ];
 
-export const DEFAULT_PERMISSION_MODE = 'bypassPermissions';
+export const DEFAULT_PERMISSION_MODE = 'default';
 
 export const DEFAULT_MODEL_SPEED = 'standard';
 
@@ -57,6 +58,15 @@ export function shortModelName(model) {
 
 export function permissionLabel(value) {
   return PERMISSION_OPTIONS.find((option) => option.value === value)?.label || '默认权限';
+}
+
+export function permissionOptionsForSecurity(security = {}) {
+  return PERMISSION_OPTIONS.filter((option) => option.value !== 'bypassPermissions' || security?.dangerFullAccessEnabled);
+}
+
+export function normalizePermissionModeForSecurity(value, security = {}) {
+  const options = permissionOptionsForSecurity(security);
+  return options.some((option) => option.value === value) ? value : DEFAULT_PERMISSION_MODE;
 }
 
 export function reasoningLabel(value) {

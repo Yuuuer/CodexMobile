@@ -63,7 +63,12 @@ export const DEFAULT_STATUS = {
       reason: ''
     }
   },
-  auth: { authenticated: false },
+  auth: { authenticated: false, canPair: true, trustedDevices: 0 },
+  security: {
+    publicAccess: false,
+    publicUrl: '',
+    dangerFullAccessEnabled: false
+  },
   runtimeDebug: {
     envEnabled: false,
     uiEnabled: false,

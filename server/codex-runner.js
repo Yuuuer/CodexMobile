@@ -22,6 +22,8 @@ import { createCodexAppServerClient, defaultServerRequestResult } from './codex-
 import { buildCodexTurnInput, imageMarkdownFromCodexImageGeneration } from './codex-native-images.js';
 import { buildCodexLarkCliContext } from './lark-cli.js';
 import { detectFeishuSkillKeys } from './feishu-skills.js';
+import { codexSandboxForPermissionMode, desktopSandboxPolicyForPermissionMode } from './permission-policy.js';
+import { readSecurityOptions } from './security-options.js';
 
 const activeRuns = new Map();
 const NON_ASCII_PATH_PATTERN = /[^\u0000-\u007F]/;
@@ -97,13 +99,7 @@ async function ensureAsciiWorkingDirectory(projectPath) {
 }
 
 function mapPermissionMode(permissionMode) {
-  if (permissionMode === 'bypassPermissions') {
-    return { sandboxMode: 'danger-full-access', approvalPolicy: 'never' };
-  }
-  if (permissionMode === 'acceptEdits') {
-    return { sandboxMode: 'workspace-write', approvalPolicy: 'never' };
-  }
-  return { sandboxMode: 'workspace-write', approvalPolicy: 'never' };
+  return codexSandboxForPermissionMode(permissionMode, readSecurityOptions());
 }
 
 function normalizeReasoningEffort(reasoningEffort) {
@@ -436,17 +432,12 @@ function emitActivity(emit, { sessionId, turnId, messageId, item, kind, status }
   });
 }
 
-function sandboxPolicyFromMode(sandboxMode, { networkAccess = false } = {}) {
-  if (sandboxMode === 'danger-full-access') {
-    return { type: 'dangerFullAccess' };
-  }
-  return {
-    type: 'workspaceWrite',
-    writableRoots: [],
+function sandboxPolicyFromPermissionMode(permissionMode, { networkAccess = false } = {}) {
+  return desktopSandboxPolicyForPermissionMode(permissionMode, {
+    ...readSecurityOptions(),
     networkAccess: Boolean(networkAccess),
-    excludeTmpdirEnvVar: false,
-    excludeSlashTmp: false
-  };
+    writableRoots: []
+  });
 }
 
 function appItemKind(type) {
@@ -1029,7 +1020,7 @@ export async function runCodexTurn({ sessionId, draftSessionId, projectPath, mes
       }),
       cwd: workingDirectory,
       approvalPolicy,
-      sandboxPolicy: sandboxPolicyFromMode(sandboxMode, { networkAccess: larkCliContext.enabled }),
+      sandboxPolicy: sandboxPolicyFromPermissionMode(permissionMode, { networkAccess: larkCliContext.enabled }),
       model: model || null,
       effort: modelReasoningEffort || null,
       collaborationMode: collaborationMode || null

@@ -1,0 +1,527 @@
+/**
+ * 截图演示入口：用真实 AppShell/FilePreviewApp 组件加载脱敏 mock 数据生成官网截图。
+ *
+ * Keywords: demo, screenshots, AppShell, mock-data, real-ui
+ *
+ * Exports:
+ * - default — `DemoScreenshotApp`，供 `/demo/screenshots` 路由渲染真实组件截图。
+ *
+ * Inward: AppShell、FilePreviewApp、pwa-theme；本文件内 mock fetch 与 props 工厂。
+ *
+ * Outward: main.jsx 在截图路由挂载；Chrome headless 生成 docs/images 下的演示图。
+ *
+ * 不负责: 生产数据读取、认证配对、真实 Git/文件写入。
+ */
+
+import { useMemo } from 'react';
+import FilePreviewApp from '../app/FilePreviewApp.jsx';
+import { AppShell } from '../app/AppShell.jsx';
+import { applyPwaTheme } from '../app/pwa-theme.js';
+import { DEFAULT_PERMISSION_MODE } from '../composer/Composer.jsx';
+
+const NOW = new Date('2026-05-15T02:10:00+08:00').getTime();
+const SESSION_ID = 'demo-codexmobile-thread';
+const PROJECT_ID = 'codexmobile';
+const DEMO_PATH = '/Users/demo/Projects/CodexMobile';
+
+const project = {
+  id: PROJECT_ID,
+  name: 'CodexMobile',
+  path: DEMO_PATH,
+  pathLabel: '~/Projects/CodexMobile'
+};
+
+const projectless = {
+  id: 'projectless',
+  name: '无项目',
+  path: '',
+  pathLabel: '',
+  projectless: true
+};
+
+const selectedSession = {
+  id: SESSION_ID,
+  projectId: PROJECT_ID,
+  title: '移动端截图演示',
+  summary: '真实组件 + 脱敏 mock 数据',
+  updatedAt: '2026-05-15T01:58:00+08:00',
+  startedAt: '2026-05-15T01:52:00+08:00'
+};
+
+const runningSession = {
+  ...selectedSession,
+  title: '移动端执行过程展示',
+  running: true,
+  runStatus: 'running',
+  updatedAt: '2026-05-15T02:08:00+08:00'
+};
+
+const sessionsByProject = {
+  projectless: [
+    { id: 'quick-note', projectId: 'projectless', title: '快速记录一个想法', summary: '普通对话 · 12 分钟', updatedAt: '2026-05-15T01:45:00+08:00' }
+  ],
+  [PROJECT_ID]: [
+    runningSession,
+    { id: 'pwa-update', projectId: PROJECT_ID, title: 'PWA 更新提示与刷新策略', summary: '完成 · 18 分钟', updatedAt: '2026-05-15T01:38:00+08:00', hasCompleteNotice: true },
+    { id: 'git-menu', projectId: PROJECT_ID, title: 'Git 小菜单操作确认', summary: 'codex/git-menu · 2 小时', updatedAt: '2026-05-14T23:42:00+08:00' },
+    { id: 'subagent-review', projectId: PROJECT_ID, title: '子代理：截图回归检查', summary: '并行任务 · 3 小时', updatedAt: '2026-05-14T22:58:00+08:00', subagent: true },
+    { id: 'file-preview', projectId: PROJECT_ID, title: '本地文件预览链路', summary: 'Markdown / PDF / 图片', updatedAt: '2026-05-14T20:12:00+08:00' }
+  ]
+};
+
+const activityMessage = {
+  id: 'activity-demo',
+  role: 'activity',
+  status: 'running',
+  clientTurnId: 'turn-demo',
+  sessionId: SESSION_ID,
+  timestamp: '2026-05-15T02:07:00+08:00',
+  startedAt: '2026-05-15T02:07:00+08:00',
+  label: '正在处理',
+  content: '正在处理',
+  activities: [
+    {
+      id: 'reasoning-1',
+      kind: 'reasoning',
+      label: '正在思考',
+      status: 'completed',
+      startedAt: '2026-05-15T02:07:00+08:00',
+      completedAt: '2026-05-15T02:07:10+08:00'
+    },
+    {
+      id: 'search-1',
+      kind: 'command_execution',
+      label: '搜索项目入口',
+      detail: 'rg -n "AppShell|Composer|TopBar|GitQuickDialog" client/src',
+      command: 'rg -n "AppShell|Composer|TopBar|GitQuickDialog" client/src',
+      status: 'completed',
+      startedAt: '2026-05-15T02:07:12+08:00',
+      completedAt: '2026-05-15T02:07:22+08:00',
+      output: 'client/src/app/AppShell.jsx\nclient/src/composer/Composer.jsx\nclient/src/panels/TopBar.jsx\nclient/src/panels/GitQuickDialog.jsx'
+    },
+    {
+      id: 'test-1',
+      kind: 'command_execution',
+      label: '运行前端测试',
+      detail: 'node --test client/src/*.test.mjs',
+      command: 'node --test client/src/*.test.mjs',
+      status: 'running',
+      startedAt: '2026-05-15T02:07:28+08:00'
+    }
+  ]
+};
+
+const completedActivityMessage = {
+  ...activityMessage,
+  id: 'activity-completed-demo',
+  status: 'completed',
+  label: '过程已同步',
+  content: '过程已同步',
+  completedAt: '2026-05-15T02:08:30+08:00',
+  durationMs: 90_000,
+  activities: activityMessage.activities.map((step) => ({
+    ...step,
+    status: 'completed',
+    completedAt: step.completedAt || '2026-05-15T02:08:30+08:00',
+    fileChanges: step.id === 'test-1'
+      ? [
+        {
+          path: 'client/src/demo/DemoScreenshotApp.jsx',
+          status: 'modified',
+          diff: '@@ -0,0 +1,3 @@\n+export default function DemoScreenshotApp() {\n+  return <AppShell {...props} />;\n+}'
+        },
+        {
+          path: 'docs/images/codexmobile-real-ui/real-ui-01-chat-execution-dark.png',
+          status: 'updated',
+          diff: '@@ -1 +1 @@\n-旧截图\n+真实组件截图'
+        }
+      ]
+      : []
+  }))
+};
+
+const baseMessages = [
+  {
+    id: 'user-1',
+    role: 'user',
+    content: '请用当前项目真实 UI 生成一组公开展示截图，数据必须脱敏。',
+    timestamp: '2026-05-15T02:06:45+08:00'
+  },
+  {
+    id: 'assistant-1',
+    role: 'assistant',
+    content: '我会直接挂载真实前端组件，注入 mock 项目、线程、Git 和文件数据，再用浏览器截图。',
+    timestamp: '2026-05-15T02:06:58+08:00'
+  }
+];
+
+const finalMessages = [
+  ...baseMessages,
+  completedActivityMessage,
+  {
+    id: 'assistant-2',
+    role: 'assistant',
+    content: '已生成真实组件截图：聊天执行流、项目会话、Composer、Git 小菜单和本地文件预览都来自当前 React 组件。',
+    timestamp: '2026-05-15T02:08:35+08:00'
+  }
+];
+
+const skills = [
+  { name: 'qingtian-sales-analysis', label: 'qingtian-sales-analysis', path: '/skills/qingtian-sales-analysis/SKILL.md', description: '青甜销售分析与复盘' },
+  { name: 'frontend-design', label: 'frontend-design', path: '/skills/frontend-design/SKILL.md', description: '前端设计与视觉检查' },
+  { name: 'pandoc-pdf-pro', label: 'pandoc-pdf-pro', path: '/skills/pandoc-pdf-pro/SKILL.md', description: '高质量 PDF 导出' }
+];
+
+const models = [
+  { value: 'gpt-5.5', label: 'GPT-5.5' },
+  { value: 'gpt-5.4', label: 'GPT-5.4' },
+  { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' }
+];
+
+const noop = () => undefined;
+const noopAsync = async () => undefined;
+
+function jsonResponse(value) {
+  return new Response(JSON.stringify(value), {
+    status: 200,
+    headers: { 'content-type': 'application/json' }
+  });
+}
+
+function installDemoFetch() {
+  if (window.__codexmobileDemoFetchInstalled) {
+    return;
+  }
+  window.__codexmobileDemoFetchInstalled = true;
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input?.url || '';
+    if (url.includes('/api/git/status')) {
+      return jsonResponse({ status: demoGitStatus() });
+    }
+    if (url.includes('/api/git/branches')) {
+      return jsonResponse({ branches: demoBranches() });
+    }
+    if (url.includes('/api/git/diff')) {
+      return jsonResponse({ diff: demoDiff() });
+    }
+    if (url.includes('/api/local-file')) {
+      return new Response(demoMarkdown(), {
+        status: 200,
+        headers: {
+          'content-type': 'text/markdown; charset=utf-8',
+          'x-local-file-editable': '1',
+          'x-local-file-mtime-ms': String(NOW)
+        }
+      });
+    }
+    return originalFetch(input, init);
+  };
+}
+
+function demoGitStatus() {
+  return {
+    branch: 'codex/real-ui-screenshots',
+    upstream: 'origin/codex/real-ui-screenshots',
+    clean: false,
+    ahead: 1,
+    behind: 0,
+    canCommit: true,
+    defaultCommitMessage: 'Update CodexMobile demo screenshots',
+    fileCount: 6,
+    files: [
+      { status: 'M', path: 'client/src/demo/DemoScreenshotApp.jsx' },
+      { status: 'M', path: 'client/src/main.jsx' },
+      { status: 'A', path: 'docs/images/codexmobile-real-ui/real-ui-01-chat-execution-dark.png' },
+      { status: 'A', path: 'docs/images/codexmobile-real-ui/real-ui-04-git-menu-light.png' }
+    ]
+  };
+}
+
+function demoBranches() {
+  return {
+    current: 'codex/real-ui-screenshots',
+    defaultBranch: 'main',
+    branches: [
+      { name: 'codex/real-ui-screenshots', current: true, upstream: 'origin/codex/real-ui-screenshots' },
+      { name: 'main', default: true, upstream: 'origin/main' },
+      { name: 'codex/pwa-update', upstream: 'origin/codex/pwa-update' }
+    ]
+  };
+}
+
+function demoDiff() {
+  return {
+    status: demoGitStatus(),
+    summary: '6 files changed, 184 insertions(+), 18 deletions(-)',
+    patch: [
+      'diff --git a/client/src/demo/DemoScreenshotApp.jsx b/client/src/demo/DemoScreenshotApp.jsx',
+      'new file mode 100644',
+      '--- /dev/null',
+      '+++ b/client/src/demo/DemoScreenshotApp.jsx',
+      '@@ -0,0 +1,7 @@',
+      '+export default function DemoScreenshotApp() {',
+      '+  return <AppShell {...demoProps} />;',
+      '+}',
+      '',
+      'diff --git a/client/src/main.jsx b/client/src/main.jsx',
+      '@@ -17,4 +18,5 @@',
+      '-const RootApp = window.location.pathname === \'/preview/file\' ? FilePreviewApp : App;',
+      '+const RootApp = window.location.pathname === \'/demo/screenshots\' ? DemoScreenshotApp : App;'
+    ].join('\n')
+  };
+}
+
+function demoMarkdown() {
+  return [
+    '# CodexMobile',
+    '',
+    'CodexMobile 是一个面向个人私有化部署的移动端 Codex 工作台。电脑继续作为真正的执行环境，移动设备负责随时接管、追问、查看过程和处理确认。',
+    '',
+    '> 本截图来自真实 FilePreviewApp 组件，内容为脱敏演示文本。',
+    '',
+    '## 当前能力',
+    '',
+    '- 读取本机 `~/.codex` 会话和项目状态',
+    '- 通过 Desktop IPC 接管已有线程',
+    '- 后台 fallback 保持移动端新任务可执行',
+    '- 在手机上处理 Git、文件、skill 和完成通知',
+    '',
+    '## 安全边界',
+    '',
+    '真实文件、密钥和执行能力仍留在自己的电脑上，移动端通过配对码和可信私有网络访问。'
+  ].join('\n');
+}
+
+function basePanelProps({ scene, theme }) {
+  return {
+    topBarProps: {
+      selectedProject: project,
+      selectedSession: selectedSessionForScene(scene),
+      connectionState: 'connected',
+      desktopBridge: { available: true, connected: true, mode: 'ipc' },
+      selectedRuntime: scene === 'chat' ? { status: 'running', startedAt: '2026-05-15T02:07:00+08:00', steerable: true } : null,
+      onMenu: noop,
+      onOpenDocs: noop,
+      onGitAction: noop,
+      onDesktopHandoff: noopAsync,
+      desktopHandoffSupported: true,
+      desktopHandoffPending: false,
+      notificationSupported: true,
+      notificationEnabled: true,
+      onEnableNotifications: noop,
+      gitDisabled: false,
+      homeMode: scene === 'composer',
+      initialGitMenuOpen: scene === 'git-menu'
+    },
+    docsPanelProps: {
+      open: false,
+      docs: { connected: false },
+      busy: false,
+      error: '',
+      onClose: noop,
+      onConnect: noopAsync,
+      onDisconnect: noopAsync,
+      onOpenHome: noop,
+      onOpenAuth: noop,
+      onRefresh: noopAsync
+    },
+    gitPanelProps: {
+      open: false,
+      action: 'diff',
+      project,
+      onToast: noop,
+      onClose: noop
+    },
+    gitQuickDialogProps: {
+      dialog: null,
+      onCancel: noop,
+      onSubmit: noop
+    },
+    recoveryCardProps: {
+      state: { visible: false },
+      onRetry: noop,
+      onSync: noop,
+      onPair: noop,
+      onStatus: noop
+    },
+    toastStackProps: {
+      toasts: scene === 'chat' ? [{ id: 'toast-1', level: 'success', title: '任务完成通知已开启', body: '移动端会收到完成提醒。' }] : [],
+      onDismiss: noop
+    },
+    pwaUpdateProps: {
+      available: scene === 'drawer',
+      onRefresh: noop,
+      onDismiss: noop
+    },
+    imagePreviewProps: {
+      image: null,
+      onClose: noop
+    }
+  };
+}
+
+function selectedSessionForScene(scene) {
+  if (scene === 'composer') {
+    return null;
+  }
+  return scene === 'chat' ? runningSession : selectedSession;
+}
+
+function drawerProps({ scene, theme }) {
+  const session = selectedSessionForScene(scene);
+  return {
+    open: scene === 'drawer',
+    onClose: noop,
+    projects: [projectless, project],
+    selectedProject: project,
+    selectedSession: session,
+    expandedProjectIds: { [PROJECT_ID]: true, projectless: true },
+    sessionsByProject,
+    loadingProjectId: null,
+    runningById: { [SESSION_ID]: scene === 'chat' || scene === 'drawer' },
+    threadRuntimeById: {
+      [SESSION_ID]: { status: 'running', startedAt: '2026-05-15T02:07:00+08:00', updatedAt: '2026-05-15T02:08:00+08:00' }
+    },
+    completedSessionIds: { 'pwa-update': true },
+    onToggleProject: noop,
+    onSelectSession: noop,
+    onRenameSession: noopAsync,
+    onDeleteSession: noopAsync,
+    onNewConversation: noop,
+    onSync: noopAsync,
+    syncing: false,
+    theme,
+    setTheme: noop,
+    runtimeDebug: { enabled: false },
+    desktopRefresh: { supported: true, enabled: true },
+    security: {
+      approvalPolicy: 'on-request',
+      sandboxMode: 'workspace-write',
+      trustedDevices: 2,
+      currentDeviceName: 'iPhone'
+    },
+    onLoggedOut: noop,
+    refreshStatus: noopAsync
+  };
+}
+
+function chatProps({ scene }) {
+  return {
+    messages: scene === 'chat' ? [...baseMessages, activityMessage] : finalMessages,
+    selectedSession: selectedSessionForScene(scene) || selectedSession,
+    loading: false,
+    loadError: '',
+    running: scene === 'chat',
+    activeRuntimeStartedAt: '2026-05-15T02:07:00+08:00',
+    now: NOW,
+    hasMoreBefore: scene === 'chat',
+    loadingOlder: false,
+    onLoadOlderMessages: noop,
+    onPreviewImage: noop,
+    onDeleteMessage: noop,
+    onImplementPlan: noop,
+    onAdjustPlan: noop
+  };
+}
+
+function composerProps({ scene }) {
+  return {
+    composerRef: null,
+    input: scene === 'composer' ? '/代码审查 重点看移动端执行流和截图展示' : '',
+    setInput: noop,
+    selectedProject: scene === 'composer' ? projectless : project,
+    gitProject: project,
+    selectedSession: selectedSessionForScene(scene),
+    onSubmit: noopAsync,
+    running: scene === 'chat',
+    onAbort: noop,
+    models,
+    selectedModel: 'gpt-5.5',
+    onSelectModel: noop,
+    selectedModelSpeed: 'balanced',
+    onSelectModelSpeed: noop,
+    selectedReasoningEffort: 'medium',
+    onSelectReasoningEffort: noop,
+    selectedCollaborationMode: scene === 'composer' ? 'plan' : null,
+    onSelectCollaborationMode: noop,
+    skills,
+    selectedSkillPaths: scene === 'composer' ? ['/skills/frontend-design/SKILL.md'] : [],
+    onToggleSkill: noop,
+    onSelectSkill: noop,
+    onClearSkills: noop,
+    permissionMode: DEFAULT_PERMISSION_MODE,
+    onSelectPermission: noop,
+    security: { approvalPolicy: 'on-request', sandboxMode: 'workspace-write' },
+    attachments: scene === 'composer'
+      ? [
+        { id: 'att-1', kind: 'image', name: 'mobile-demo.png', mimeType: 'image/png', path: '/tmp/mobile-demo.png', size: 248_000 },
+        { id: 'att-2', kind: 'file', name: 'README.md', mimeType: 'text/markdown', path: '/tmp/README.md', size: 18_240 }
+      ]
+      : [],
+    onUploadFiles: noop,
+    onRemoveAttachment: noop,
+    fileMentions: scene === 'composer' ? [{ path: 'client/src/App.jsx', relativePath: 'client/src/App.jsx', name: 'App.jsx' }] : [],
+    onAddFileMention: noop,
+    onRemoveFileMention: noop,
+    uploading: false,
+    contextStatus: {
+      available: true,
+      usedTokens: 128_000,
+      maxTokens: 400_000,
+      percent: 32,
+      label: '上下文 32%'
+    },
+    runSteerable: true,
+    desktopBridge: { available: true, connected: true, mode: 'ipc' },
+    queueDrafts: scene === 'chat'
+      ? [{ id: 'queue-1', text: '顺便把 README 截图引用也更新掉', mode: 'queue', createdAt: '2026-05-15T02:08:00+08:00' }]
+      : [],
+    onRestoreQueueDraft: noop,
+    onRemoveQueueDraft: noop,
+    onSteerQueueDraft: noop,
+    onCreateGitBranch: noopAsync,
+    onCompactContext: noop,
+    readOnly: false,
+    readOnlyReason: '',
+    homeMode: scene === 'composer',
+    projects: [projectless, project],
+    onSelectHomeProject: noop
+  };
+}
+
+function shellClass(scene) {
+  const classes = ['app-shell'];
+  if (scene === 'drawer') {
+    classes.push('drawer-active');
+  }
+  if (scene === 'composer') {
+    classes.push('is-home');
+  }
+  return classes.join(' ');
+}
+
+export default function DemoScreenshotApp() {
+  installDemoFetch();
+  const params = useMemo(() => new URLSearchParams(window.location.search), []);
+  const theme = params.get('theme') === 'dark' ? 'dark' : 'light';
+  const scene = params.get('scene') || 'chat';
+  localStorage.setItem('codexmobile.theme', theme);
+  applyPwaTheme(theme);
+
+  if (scene === 'file-preview') {
+    return <FilePreviewApp />;
+  }
+
+  const context = { scene, theme };
+  return (
+    <AppShell
+      shellClass={shellClass(scene)}
+      panelProps={basePanelProps(context)}
+      drawerProps={drawerProps(context)}
+      chatProps={chatProps(context)}
+      composerProps={composerProps(context)}
+      homeVisible={scene === 'composer'}
+    />
+  );
+}

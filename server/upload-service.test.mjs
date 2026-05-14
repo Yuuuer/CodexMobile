@@ -12,7 +12,9 @@ import test from 'node:test';
 import {
   normalizeFileMentions,
   normalizeAttachments,
+  normalizeUploadMimeType,
   parseMultipartFile,
+  isUploadAttachmentPathAllowed,
   withAttachmentReferences,
   withFileMentionReferences,
   withImageAttachmentPreviews
@@ -62,6 +64,26 @@ test('normalizeAttachments keeps valid paths and splits image/file references', 
     withAttachmentReferences('看文件', attachments),
     '看文件\n\n附件路径:\n- 图片: 图[片].png (/tmp/a image.png)\n- 文件: brief.pdf (/tmp/brief.pdf)'
   );
+});
+
+test('normalizeUploadMimeType downgrades obvious image MIME mismatches', () => {
+  assert.equal(normalizeUploadMimeType('image/png', Buffer.from('%PDF-1.7')), 'application/octet-stream');
+  assert.equal(normalizeUploadMimeType('image/png', Buffer.from('89504e470d0a1a0a', 'hex')), 'image/png');
+});
+
+test('isUploadAttachmentPathAllowed requires upload root and id-prefixed file name', () => {
+  assert.equal(isUploadAttachmentPathAllowed({
+    id: 'abc',
+    path: '/tmp/uploads/2026-05-14/abc-image.png'
+  }, '/tmp/uploads'), true);
+  assert.equal(isUploadAttachmentPathAllowed({
+    id: 'abc',
+    path: '/tmp/uploads/2026-05-14/other-image.png'
+  }, '/tmp/uploads'), false);
+  assert.equal(isUploadAttachmentPathAllowed({
+    id: 'abc',
+    path: '/etc/passwd'
+  }, '/tmp/uploads'), false);
 });
 
 test('file mention references dedupe paths and append to the model message', () => {

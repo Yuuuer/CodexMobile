@@ -47,11 +47,12 @@ export function TopBar({
   notificationEnabled,
   onEnableNotifications,
   gitDisabled = false,
-  homeMode = false
+  homeMode = false,
+  initialGitMenuOpen = false
 }) {
   const status = bridgeConnectionLabel(connectionState, desktopBridge, { selectedSession, selectedRuntime });
   const [menuOpen, setMenuOpen] = useState(false);
-  const [gitMenuOpen, setGitMenuOpen] = useState(false);
+  const [gitMenuOpen, setGitMenuOpen] = useState(initialGitMenuOpen);
   const [copiedThreadId, setCopiedThreadId] = useState(false);
   const menuRef = useRef(null);
   const gitMenuRef = useRef(null);
@@ -93,7 +94,7 @@ export function TopBar({
     onGitAction?.(action);
   }
 
-  function handleOpenGitPanel() {
+  function handleToggleGitMenu() {
     setMenuOpen(false);
     setGitMenuOpen((value) => !value);
   }
@@ -150,7 +151,7 @@ export function TopBar({
           <button
             type="button"
             className="icon-button"
-            onClick={handleOpenGitPanel}
+            onClick={handleToggleGitMenu}
             disabled={gitDisabled}
             aria-label="打开 Git 操作"
             aria-expanded={gitMenuOpen}

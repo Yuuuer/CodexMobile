@@ -1,7 +1,7 @@
 /**
- * 验证 composer-options：模型速度默认值、标签与 Codex service tier 映射。
+ * 验证 composer-options：模型速度、权限安全过滤与 Codex service tier 映射。
  *
- * Keywords: composer-options, model speed, tests
+ * Keywords: composer-options, model speed, permission, tests
  *
  * Exports: 无导出 / 内含用例
  *
@@ -12,8 +12,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   DEFAULT_MODEL_SPEED,
+  DEFAULT_PERMISSION_MODE,
   modelSpeedLabel,
   normalizeModelSpeed,
+  normalizePermissionModeForSecurity,
+  permissionOptionsForSecurity,
   serviceTierForModelSpeed
 } from './composer-options.js';
 
@@ -29,4 +32,18 @@ test('model speed defaults to standard unless fast is selected', () => {
 test('fast model speed maps to Codex service tier', () => {
   assert.equal(serviceTierForModelSpeed('fast'), 'fast');
   assert.equal(serviceTierForModelSpeed('standard'), null);
+});
+
+test('permission options hide danger full access unless backend enables it', () => {
+  assert.equal(DEFAULT_PERMISSION_MODE, 'default');
+  assert.deepEqual(permissionOptionsForSecurity({ dangerFullAccessEnabled: false }).map((option) => option.value), [
+    'default',
+    'acceptEdits'
+  ]);
+  assert.deepEqual(permissionOptionsForSecurity({ dangerFullAccessEnabled: true }).map((option) => option.value), [
+    'default',
+    'acceptEdits',
+    'bypassPermissions'
+  ]);
+  assert.equal(normalizePermissionModeForSecurity('bypassPermissions', { dangerFullAccessEnabled: false }), 'default');
 });

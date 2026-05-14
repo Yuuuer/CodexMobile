@@ -7,7 +7,7 @@
  * - MarkdownContent、MessageContent — 完整与拆分正文渲染。
  * - contentWithAttachmentPreviews、splitMessageImages — 附件行与图文拆分。
  *
- * Inward: ../api、../app/session-utils、clipboard、memory-citation、ImagePreview。
+ * Inward: ../app/session-utils、clipboard、memory-citation、ImagePreview。
  *
  * Outward: ChatMessage.jsx、PlanMessage、ActivityTimeline 等。
  */
@@ -17,7 +17,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
-import { getToken } from '../api.js';
 import { isLocalFileSource, isLocalImageSource, localFilePreviewPath } from '../app/session-utils.js';
 import { copyTextToClipboard } from '../utils/clipboard.js';
 import { GeneratedImage } from './ImagePreview.jsx';
@@ -339,7 +338,7 @@ function normalizeInlineHref(value) {
     return '';
   }
   if (isLocalFileSource(raw)) {
-    return localFilePreviewPath(raw, getToken());
+    return localFilePreviewPath(raw);
   }
   if (/^https?:\/\//i.test(raw) || /^mailto:/i.test(raw) || raw.startsWith('/') || raw.startsWith('#')) {
     return raw;

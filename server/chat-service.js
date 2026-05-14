@@ -59,6 +59,7 @@ function planImplementationHeadlessMessage({ codexMessage, visibleMessage, colla
 export function createChatService({
   imagePromptState,
   defaultReasoningEffort = 'xhigh',
+  uploadRoot = '',
   getProject,
   getSession,
   getCacheSnapshot,
@@ -253,7 +254,8 @@ export function createChatService({
     const prepared = prepareChatRequest(body, {
       getSession,
       config,
-      defaultReasoningEffort
+      defaultReasoningEffort,
+      uploadRoot
     });
     const {
       attachments,
@@ -325,7 +327,7 @@ export function createChatService({
         model: modelForTurn,
         reasoningEffort: reasoningEffortForTurn,
         serviceTier: serviceTierForTurn,
-        permissionMode: body.permissionMode || 'bypassPermissions',
+        permissionMode: body.permissionMode || 'default',
         collaborationMode: collaborationMode || null
       }, { forceQueued: true, autoStart: false });
       runtimeDebugLine('sendChat.exit', { branch: 'hold-local-queue', delivery: 'queued', turnId });
@@ -494,7 +496,7 @@ export function createChatService({
       model: modelForTurn,
       reasoningEffort: reasoningEffortForTurn,
       serviceTier: serviceTierForTurn,
-      permissionMode: body.permissionMode || 'bypassPermissions',
+      permissionMode: body.permissionMode || 'default',
       collaborationMode: collaborationMode || null
     });
 

@@ -1,11 +1,12 @@
 /**
- * 带设备 Token 的 JSON API 封装与本地 Token 读写。
+ * Cookie 认证 API 封装，并保留旧 localStorage Bearer token 的一次性迁移。
  *
- * Keywords: fetch, api, bearer-token, localStorage, timeout
+ * Keywords: fetch, api, cookie-auth, bearer-migration, timeout
  *
  * Exports:
- * - getToken / setToken / clearToken — localStorage 中的设备 Token。
- * - apiFetch — 统一 headers、超时与 JSON 体。
+ * - getToken / setToken / clearToken — 旧 localStorage token 迁移兼容。
+ * - apiFetch / apiBlobFetch — 统一 headers、Cookie 凭据、超时与响应错误处理。
+ * - websocketUrl — 返回 Cookie 鉴权的同源 WS 地址。
  *
  * Inward: fetch、localStorage。
  *
@@ -13,35 +14,53 @@
  */
 
 const TOKEN_KEY = 'codexmobile.deviceToken';
+const MIGRATED_HEADERS = ['x-codexmobile-token-migrated', 'x-codexmobile-clear-legacy-token'];
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY) || '';
 }
 
 export function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+    return;
+  }
+  clearToken();
 }
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+function maybeClearMigratedToken(response) {
+  if (MIGRATED_HEADERS.some((header) => response.headers.get(header) === '1')) {
+    clearToken();
+  }
+}
+
+function legacyAuthHeaders(headers = {}) {
+  const token = getToken();
+  return {
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
+    ...headers
+  };
+}
+
 export async function apiFetch(path, options = {}) {
   const { timeoutMs: rawTimeoutMs, ...fetchOptions } = options;
-  const token = getToken();
   const timeoutMs = Number(rawTimeoutMs || 0);
   const controller = timeoutMs > 0 ? new AbortController() : null;
   const timeout = controller ? globalThis.setTimeout(() => controller.abort(), timeoutMs) : null;
   const headers = {
     ...(fetchOptions.body instanceof FormData ? {} : { 'content-type': 'application/json' }),
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
-    ...(fetchOptions.headers || {})
+    ...legacyAuthHeaders(fetchOptions.headers || {})
   };
 
   let response;
   try {
     response = await fetch(path, {
       ...fetchOptions,
+      credentials: fetchOptions.credentials || 'same-origin',
       headers,
       signal: fetchOptions.signal || controller?.signal,
       body:
@@ -62,6 +81,7 @@ export async function apiFetch(path, options = {}) {
     }
   }
 
+  maybeClearMigratedToken(response);
   const text = await response.text();
   const data = text ? JSON.parse(text) : {};
   if (!response.ok) {
@@ -74,15 +94,14 @@ export async function apiFetch(path, options = {}) {
 }
 
 export async function apiBlobFetch(path, options = {}) {
-  const token = getToken();
   const headers = {
     ...(options.body instanceof FormData ? {} : { 'content-type': 'application/json' }),
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
-    ...(options.headers || {})
+    ...legacyAuthHeaders(options.headers || {})
   };
 
   const response = await fetch(path, {
     ...options,
+    credentials: options.credentials || 'same-origin',
     headers,
     body:
       options.body && !(options.body instanceof FormData) && typeof options.body !== 'string'
@@ -90,6 +109,7 @@ export async function apiBlobFetch(path, options = {}) {
         : options.body
   });
 
+  maybeClearMigratedToken(response);
   if (!response.ok) {
     const text = await response.text();
     let message = `Request failed: ${response.status}`;
@@ -111,7 +131,6 @@ export async function apiBlobFetch(path, options = {}) {
 }
 
 export function websocketUrl() {
-  const token = encodeURIComponent(getToken());
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}/ws?token=${token}`;
+  return `${protocol}//${window.location.host}/ws`;
 }

@@ -1,17 +1,20 @@
 /**
- * 设置抽屉子页：主题、归档入口、诊断开关与版本号展示。
+ * 设置抽屉子页：主题、归档、安全设备、诊断开关与版本号展示。
  *
- * Keywords: drawer, settings, theme, diagnostics, archive-box
+ * Keywords: drawer, settings, theme, diagnostics, archive-box, security-devices
  *
  * Exports:
  * - DrawerSettingsView — 设置页视图组件。
  *
- * Inward: lucide-react；父级 Drawer 注入状态与事件。
+ * Inward: lucide-react、api、security-devices；父级 Drawer 注入状态与事件。
  *
  * Outward: Drawer 在 settings 子视图中渲染。
  */
 
-import { Archive, Bug, ChevronLeft, ChevronRight, Info, MonitorCog, Moon, Sun, X } from 'lucide-react';
+import { Archive, Bug, ChevronLeft, ChevronRight, Info, LogOut, MonitorCog, Moon, RefreshCw, ShieldCheck, Smartphone, Sun, Trash2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { apiFetch } from '../api.js';
+import { deviceMetaText, deviceStatusText, sortDevicesForDisplay } from '../security-devices.js';
 
 export function DrawerSettingsView({
   open,
@@ -28,8 +31,57 @@ export function DrawerSettingsView({
   desktopRefreshSaving,
   desktopRefreshError,
   onDesktopRefreshToggle,
+  onLoggedOut,
   appVersion
 }) {
+  const [devices, setDevices] = useState([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [devicesError, setDevicesError] = useState('');
+  const sortedDevices = sortDevicesForDisplay(devices);
+
+  async function loadDevices() {
+    setDevicesLoading(true);
+    setDevicesError('');
+    try {
+      const data = await apiFetch('/api/devices');
+      setDevices(Array.isArray(data.devices) ? data.devices : []);
+    } catch (error) {
+      setDevicesError(error.message || '设备列表读取失败');
+    } finally {
+      setDevicesLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    setDevicesLoading(true);
+    try {
+      await apiFetch('/api/logout', { method: 'POST' });
+      onLoggedOut?.();
+    } catch (error) {
+      setDevicesError(error.message || '退出失败');
+    } finally {
+      setDevicesLoading(false);
+    }
+  }
+
+  async function handleDeleteDevice(deviceId) {
+    setDevicesLoading(true);
+    setDevicesError('');
+    try {
+      await apiFetch(`/api/devices/${encodeURIComponent(deviceId)}`, { method: 'DELETE' });
+      await loadDevices();
+    } catch (error) {
+      setDevicesError(error.message || '删除设备失败');
+      setDevicesLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (open) {
+      loadDevices();
+    }
+  }, [open]);
+
   const runtimeDebugText = runtimeDebug?.envEnabled
     ? '环境变量已启用'
     : runtimeDebug?.uiEnabled
@@ -112,6 +164,61 @@ export function DrawerSettingsView({
                   </div>
                 </div>
                 <ChevronRight size={16} className="settings-row-arrow" />
+              </button>
+            </div>
+          </section>
+
+          <section className="settings-section-card" aria-labelledby="security-title">
+            <h3 id="security-title" className="drawer-section-title">安全与设备</h3>
+            <div className="settings-list">
+              <div className="settings-row">
+                <div className="settings-row-main">
+                  <span className="settings-row-icon" aria-hidden="true">
+                    <ShieldCheck size={16} />
+                  </span>
+                  <div>
+                    <span className="settings-row-title">可信设备</span>
+                    <small>{devicesLoading ? '正在刷新' : `${sortedDevices.length} 台设备`}</small>
+                  </div>
+                </div>
+                <button type="button" className="icon-button" onClick={loadDevices} disabled={devicesLoading} aria-label="刷新设备">
+                  <RefreshCw size={16} className={devicesLoading ? 'spin' : ''} />
+                </button>
+              </div>
+              {devicesError ? (
+                <div className="settings-row-note is-error">
+                  <Info size={13} />
+                  <span>{devicesError}</span>
+                </div>
+              ) : null}
+              {sortedDevices.map((device) => (
+                <div key={device.id} className="settings-row">
+                  <div className="settings-row-main">
+                    <span className="settings-row-icon" aria-hidden="true">
+                      <Smartphone size={16} />
+                    </span>
+                    <div>
+                      <span className="settings-row-title">{device.name || '未命名设备'}</span>
+                      <small>{deviceStatusText(device)} · {deviceMetaText(device)}</small>
+                    </div>
+                  </div>
+                  {!device.current ? (
+                    <button type="button" className="icon-button" onClick={() => handleDeleteDevice(device.id)} disabled={devicesLoading} aria-label="删除设备">
+                      <Trash2 size={16} />
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              <button type="button" className="settings-row is-actionable" onClick={handleLogout} disabled={devicesLoading}>
+                <div className="settings-row-main">
+                  <span className="settings-row-icon" aria-hidden="true">
+                    <LogOut size={16} />
+                  </span>
+                  <div>
+                    <span className="settings-row-title">退出当前设备</span>
+                    <small>清除本机信任状态并回到配对页</small>
+                  </div>
+                </div>
               </button>
             </div>
           </section>

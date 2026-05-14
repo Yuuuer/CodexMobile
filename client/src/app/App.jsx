@@ -15,9 +15,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { apiFetch, getToken } from '../api.js';
+import { apiFetch, clearToken, getToken } from '../api.js';
 import { DEFAULT_PERMISSION_MODE } from '../composer/Composer.jsx';
-import { DEFAULT_MODEL_SPEED, normalizeModelSpeed } from '../composer/composer-options.js';
+import { DEFAULT_MODEL_SPEED, normalizeModelSpeed, normalizePermissionModeForSecurity } from '../composer/composer-options.js';
 import { useComposerSelections } from '../composer/useComposerSelections.js';
 import { useQueueDrafts } from '../composer/useQueueDrafts.js';
 import { connectionRecoveryState } from '../connection-recovery.js';
@@ -42,6 +42,7 @@ import { mergeModelSettingsIntoStatus, nextSyncedComposerSettings } from './mode
 import { rememberSelectedSession } from './selection-persistence.js';
 import {
   emptyContextStatus,
+  emptyMessagePage,
   hasRunningKey,
   isDraftSession,
   reconcileThreadRuntimeWithSessions,
@@ -111,6 +112,7 @@ export default function App() {
   const [loadingProjectId, setLoadingProjectId] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [messagePage, setMessagePage] = useState(() => emptyMessagePage());
   const [sessionLoadingId, setSessionLoadingId] = useState(null);
   const [sessionLoadError, setSessionLoadError] = useState('');
   const [activityClockNow, setActivityClockNow] = useState(() => Date.now());
@@ -172,6 +174,17 @@ export default function App() {
   const composerRef = useRef(null);
   const gitQuickDialogResolverRef = useRef(null);
 
+  const handleAuthRevoked = useCallback(() => {
+    clearToken();
+    setAuthenticated(false);
+    setConnectionState('disconnected');
+    showToast({
+      level: 'warning',
+      title: '设备已退出',
+      body: '当前设备认证已失效，需要重新配对。'
+    });
+  }, [showToast]);
+
   const closeGitQuickDialog = useCallback((value = null) => {
     const resolver = gitQuickDialogResolverRef.current;
     gitQuickDialogResolverRef.current = null;
@@ -211,6 +224,13 @@ export default function App() {
   });
 
   useViewportSizing(composerRef);
+
+  useEffect(() => {
+    const normalized = normalizePermissionModeForSecurity(permissionMode, status.security);
+    if (normalized !== permissionMode) {
+      setPermissionMode(normalized);
+    }
+  }, [permissionMode, status.security]);
 
   useEffect(() => {
     if (!authenticated || desktopDrawerSeededRef.current || typeof window === 'undefined' || !window.matchMedia) {
@@ -404,6 +424,7 @@ export default function App() {
     setAuthenticated,
     setSelectedSession,
     setMessages,
+    setMessagePage,
     setContextStatus,
     setLoadingProjectId,
     setSessionsByProject,
@@ -501,6 +522,7 @@ export default function App() {
   const {
     handleToggleProject,
     handleSelectSession,
+    handleLoadOlderMessages,
     handleRenameSession,
     handleDeleteSession,
     handleDeleteMessage,
@@ -522,6 +544,7 @@ export default function App() {
     setSelectedSession,
     setSessionsByProject,
     setMessages,
+    setMessagePage,
     setSessionLoadingId,
     setSessionLoadError,
     setContextStatus,
@@ -535,7 +558,7 @@ export default function App() {
 
   useAppWebSocket({
     useEffect,
-    authenticated,
+    authenticated: authenticated && Boolean(status.auth?.authenticated),
     defaultStatus: DEFAULT_STATUS,
     wsRef,
     selectedProjectRef,
@@ -558,7 +581,8 @@ export default function App() {
     setProjects,
     setSelectedProject,
     setExpandedProjectIds,
-    loadSessions
+    loadSessions,
+    onAuthRevoked: handleAuthRevoked
   });
 
   const {
@@ -1022,6 +1046,8 @@ export default function App() {
     setTheme,
     runtimeDebug: status.runtimeDebug,
     desktopRefresh: status.desktopRefresh,
+    security: status.security,
+    onLoggedOut: handleAuthRevoked,
     refreshStatus: loadStatus
   };
   const chatProps = {
@@ -1032,6 +1058,9 @@ export default function App() {
     running: selectedRunning,
     activeRuntimeStartedAt: selectedRuntime?.startedAt || selectedRuntime?.updatedAt || null,
     now: activityClockNow,
+    hasMoreBefore: messagePage.hasMoreBefore,
+    loadingOlder: messagePage.loadingOlder,
+    onLoadOlderMessages: handleLoadOlderMessages,
     onPreviewImage: setPreviewImage,
     onDeleteMessage: handleDeleteMessage,
     onImplementPlan: selectedSessionArchived ? null : handleImplementPlan,
@@ -1063,6 +1092,7 @@ export default function App() {
     onClearSkills: clearSelectedSkills,
     permissionMode,
     onSelectPermission: setPermissionMode,
+    security: status.security,
     attachments,
     onUploadFiles: handleUploadFiles,
     onRemoveAttachment: handleRemoveAttachment,

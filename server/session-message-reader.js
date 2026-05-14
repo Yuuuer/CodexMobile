@@ -511,6 +511,14 @@ function sortMessagesByConversationOrder(messages) {
     .map((item) => item.message);
 }
 
+function messageTurnIds(messages = []) {
+  return new Set(
+    (Array.isArray(messages) ? messages : [])
+      .map((message) => String(message?.turnId || '').trim())
+      .filter(Boolean)
+  );
+}
+
 export function isoFromEpochSeconds(value) {
   const seconds = Number(value);
   if (!Number.isFinite(seconds) || seconds <= 0) {
@@ -571,12 +579,26 @@ export function createSessionMessageReader({
     const deletedIds = await readDeletedMessageIds(sessionId);
     const thread = await readThread(sessionId);
 
-    const messages = Array.isArray(thread.messages)
+    const baseMessages = Array.isArray(thread.messages)
       ? thread.messages.map((message) => ({ ...message }))
-      : messagesFromDesktopThread(thread, { includeActivity });
+      : messagesFromDesktopThread(thread, { includeActivity: false });
     const contextState = await readRolloutContextStateImpl(thread.path, sessionId);
+    const orderedBaseMessages = sortMessagesByConversationOrder(filterDeletedMessages(baseMessages, deletedIds));
+    const page = paginateMessages(orderedBaseMessages, { limit, offset, latest });
+
+    let messages = page.messages.map((message) => ({ ...message }));
     if (includeActivity) {
-      const rawActivities = await readRawSessionActivities(thread.path, thread.turns || []);
+      const visibleTurnIds = messageTurnIds(messages);
+      if (contextState?.runtime?.turnId) {
+        visibleTurnIds.add(String(contextState.runtime.turnId));
+      }
+      if (!Array.isArray(thread.messages) && visibleTurnIds.size) {
+        const activityMessages = messagesFromDesktopThread(thread, { includeActivity: true, turnIds: visibleTurnIds })
+          .filter((message) => message?.role === 'activity');
+        messages.push(...activityMessages);
+      }
+      const activityOptions = visibleTurnIds.size ? { turnIds: visibleTurnIds } : {};
+      const rawActivities = await readRawSessionActivities(thread.path, thread.turns || [], activityOptions);
       removeFallbackActivitiesCoveredByRaw(messages, rawActivities);
       for (const item of rawActivities) {
         upsertDesktopActivity(
@@ -588,7 +610,7 @@ export function createSessionMessageReader({
           thread.id || sessionId
         );
       }
-      const collabActivities = await readDesktopCollabActivities(thread.path);
+      const collabActivities = await readDesktopCollabActivities(thread.path, activityOptions);
       for (const item of collabActivities) {
         upsertDesktopActivity(
           messages,
@@ -602,10 +624,11 @@ export function createSessionMessageReader({
       messages.splice(0, messages.length, ...removeDuplicateGuidedUserSegments(messages));
       sortDesktopActivitySteps(messages);
     }
-    const orderedMessages = sortMessagesByConversationOrder(messages);
+    const orderedMessages = sortMessagesByConversationOrder(filterDeletedMessages(messages, deletedIds));
 
     return {
-      ...paginateMessages(filterDeletedMessages(orderedMessages, deletedIds), { limit, offset, latest }),
+      ...page,
+      messages: orderedMessages,
       context: publicContextState(contextState, getConfigContext() || {})
     };
   }

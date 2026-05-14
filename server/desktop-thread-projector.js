@@ -1045,12 +1045,25 @@ function desktopActivityFromThreadItem(item, turnId, index, timestamp, turnStatu
   return null;
 }
 
-export function messagesFromDesktopThread(thread, { includeActivity = false } = {}) {
+function normalizeTurnIdFilter(turnIds = null) {
+  if (!turnIds) {
+    return null;
+  }
+  const values = turnIds instanceof Set ? [...turnIds] : Array.isArray(turnIds) ? turnIds : [turnIds];
+  const normalized = values.map((value) => String(value || '').trim()).filter(Boolean);
+  return normalized.length ? new Set(normalized) : null;
+}
+
+export function messagesFromDesktopThread(thread, { includeActivity = false, turnIds = null } = {}) {
   const messages = [];
   const turns = Array.isArray(thread?.turns) ? thread.turns : [];
+  const turnFilter = normalizeTurnIdFilter(turnIds);
 
   turns.forEach((turn, turnIndex) => {
     const turnId = turn.id || `${thread.id}-desktop-${turnIndex + 1}`;
+    if (turnFilter && !turnFilter.has(String(turnId))) {
+      return;
+    }
     const startedAt = isoFromDesktopTimeValue(turn.startedAt) || new Date().toISOString();
     const turnStatus = desktopTurnRuntimeStatus(turn, { isLatestTurn: turnIndex === turns.length - 1 });
     const completedAt = isoFromDesktopTimeValue(turn.completedAt) || null;

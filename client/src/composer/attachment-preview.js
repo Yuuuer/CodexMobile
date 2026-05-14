@@ -1,7 +1,7 @@
 /**
- * 判断附件是否为图片并生成本地图片预览 URL（含 token 查询参数）。
+ * 判断附件是否为图片并生成本地图片预览 URL（Cookie 鉴权，不拼 token）。
  *
- * Keywords: attachment, image, preview URL, local-image
+ * Keywords: attachment, image, preview URL, local-image, cookie-auth
  *
  * Exports:
  * - isImageAttachment — 按 kind 或 MIME 判断是否为图片。
@@ -17,12 +17,10 @@ export function isImageAttachment(attachment = {}) {
   return attachment.kind === 'image' || mimeType.startsWith('image/');
 }
 
-export function attachmentPreviewUrl(attachment = {}, token = '') {
+export function attachmentPreviewUrl(attachment = {}) {
   const imagePath = String(attachment.path || '').trim();
   if (!imagePath) {
     return '';
   }
-  const tokenValue = String(token || '').trim();
-  const tokenParam = tokenValue ? `&token=${encodeURIComponent(tokenValue)}` : '';
-  return `/api/local-image?path=${encodeURIComponent(imagePath)}${tokenParam}`;
+  return `/api/local-image?path=${encodeURIComponent(imagePath)}`;
 }

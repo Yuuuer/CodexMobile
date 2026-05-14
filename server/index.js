@@ -19,13 +19,35 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import {
-  extractBearerToken,
-  getPairingCode,
   getTrustedDeviceCount,
   initializeAuth,
-  pairDevice,
+  completePairingRequest,
+  listDevices,
+  registerSocket,
+  revokeDevice,
+  revokeToken,
+  startPairingRequest,
+  unregisterSocket,
   verifyToken
 } from './auth.js';
+import {
+  clientRemoteAddress,
+  isPrivateRemoteAddress,
+  isRequestTransportSecure,
+  normalizeRemoteAddress,
+  readSecurityOptions,
+  requestMayUsePublicHttp,
+  sameOriginAllowed
+} from './security-options.js';
+import {
+  buildAuthCookie,
+  clearAuthCookie,
+  extractCookieToken,
+  extractRequestToken,
+  rejectSuspiciousFetchSite,
+  rejectUnsafeOrigin,
+  setSecurityHeaders
+} from './request-security.js';
 import {
   applySessionTitleUpdate,
   deleteSession,
@@ -113,6 +135,7 @@ const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const MAX_VOICE_BYTES = 10 * 1024 * 1024;
 const DEFAULT_REASONING_EFFORT = 'xhigh';
 const SYNC_RESPONSE_TIMEOUT_MS = Math.max(1000, Number(process.env.CODEXMOBILE_SYNC_RESPONSE_TIMEOUT_MS) || 12_000);
+const securityOptions = readSecurityOptions();
 let syncRefreshPromise = null;
 
 const sockets = new Set();
@@ -195,21 +218,71 @@ function normalizeRequestedModel(value) {
 
 function requestOrigin(req) {
   const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
-  const proto = forwardedProto || (req.socket.encrypted ? 'https' : 'http');
-  const host = req.headers['x-forwarded-host'] || req.headers.host || `127.0.0.1:${PORT}`;
+  const trustedForwarded = securityOptions.trustedProxyCidrs?.length ? forwardedProto : '';
+  const proto = trustedForwarded || (req.socket.encrypted ? 'https' : 'http');
+  const host = securityOptions.trustedProxyCidrs?.length && req.headers['x-forwarded-host']
+    ? req.headers['x-forwarded-host']
+    : req.headers.host || `127.0.0.1:${PORT}`;
   return `${proto}://${String(host).split(',')[0].trim()}`;
 }
 
 function remoteAddress(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+  return clientRemoteAddress(req, securityOptions);
 }
 
-async function isAuthenticated(req, url = null) {
-  return verifyToken(extractBearerToken(req, url), { remoteAddress: remoteAddress(req) });
+function isLoopbackAddress(value) {
+  const address = normalizeRemoteAddress(value);
+  return address === '127.0.0.1' || address === '::1' || address === 'localhost';
+}
+
+function authCookieOptions(req) {
+  return {
+    secure: isRequestTransportSecure(req, securityOptions),
+    maxAgeSeconds: Math.floor(securityOptions.tokenTtlMs / 1000)
+  };
+}
+
+function requestToken(req) {
+  return extractRequestToken(req, { allowBearer: securityOptions.legacyBearerEnabled });
+}
+
+function setResponseCookie(res, cookieValue) {
+  const previous = res.getHeader('set-cookie');
+  if (!previous) {
+    res.setHeader('set-cookie', cookieValue);
+    return;
+  }
+  const next = Array.isArray(previous) ? [...previous, cookieValue] : [previous, cookieValue];
+  res.setHeader('set-cookie', next);
+}
+
+async function authenticateRequest(req, res = null, { rotate = true } = {}) {
+  const requestAuth = requestToken(req);
+  const result = await verifyToken(requestAuth.token, {
+    remoteAddress: remoteAddress(req),
+    userAgent: req.headers['user-agent'],
+    securityOptions,
+    rotate
+  });
+  if (!result.ok) {
+    return { ok: false, token: requestAuth.token, source: requestAuth.source };
+  }
+  if (res && result.replacementToken) {
+    setResponseCookie(res, buildAuthCookie(result.replacementToken, authCookieOptions(req)));
+  } else if (res && requestAuth.source === 'bearer') {
+    setResponseCookie(res, buildAuthCookie(requestAuth.token, authCookieOptions(req)));
+    res.setHeader('x-codexmobile-token-migrated', '1');
+  }
+  return { ...result, token: requestAuth.token, source: requestAuth.source };
+}
+
+async function isAuthenticated(req, url = null, res = null) {
+  void url;
+  return (await authenticateRequest(req, res)).ok;
 }
 
 async function requireAuth(req, res, pathname = '', url = null) {
-  if (await isAuthenticated(req, url)) {
+  if (await isAuthenticated(req, url, res)) {
     return true;
   }
   if ((req.method || 'GET') !== 'GET') {
@@ -325,6 +398,7 @@ function startThreadModelSettingsWatcher() {
 const chatService = createChatService({
   imagePromptState: IMAGE_PROMPT_STATE,
   defaultReasoningEffort: DEFAULT_REASONING_EFFORT,
+  uploadRoot: UPLOAD_ROOT,
   getProject,
   getSession,
   getCacheSnapshot,
@@ -576,7 +650,7 @@ async function refreshCodexCacheForSyncResponse() {
   return result;
 }
 
-async function publicStatus(authenticated) {
+async function publicStatus(authenticated, req = null) {
   const snapshot = getCacheSnapshot();
   const config = mergeStatusModelSettings(snapshot.config || await getStatusConfigFallback() || {});
   const desktopBridge = await getDesktopBridgeStatus();
@@ -611,7 +685,15 @@ async function publicStatus(authenticated) {
     auth: {
       required: true,
       authenticated,
-      trustedDevices: getTrustedDeviceCount()
+      trustedDevices: getTrustedDeviceCount(),
+      canPair: req
+        ? securityOptions.allowRemotePairing || isPrivateRemoteAddress(remoteAddress(req), securityOptions)
+        : true
+    },
+    security: {
+      publicAccess: securityOptions.publicAccess,
+      publicUrl: securityOptions.publicUrl || '',
+      dangerFullAccessEnabled: securityOptions.dangerFullAccessEnabled
     }
   };
 }
@@ -621,23 +703,98 @@ async function handleApi(req, res, url) {
   const pathname = url.pathname;
 
   if (method === 'GET' && pathname === '/api/status') {
-    sendJson(res, 200, await publicStatus(await isAuthenticated(req, url)));
+    const authResult = await authenticateRequest(req, res);
+    sendJson(res, 200, await publicStatus(authResult.ok, req));
+    return;
+  }
+
+  if (method === 'POST' && pathname === '/api/pair/request') {
+    const body = await readBody(req);
+    const result = await startPairingRequest({
+      deviceName: body.deviceName,
+      userAgent: req.headers['user-agent'],
+      remoteAddress: remoteAddress(req),
+      securityOptions
+    });
+    if (!result.ok) {
+      if (result.retryAfterSeconds) {
+        res.setHeader('retry-after', String(result.retryAfterSeconds));
+      }
+      sendJson(res, result.statusCode || 400, {
+        error: result.error || 'Pairing request failed',
+        retryAfterSeconds: result.retryAfterSeconds || null
+      });
+      return;
+    }
+    sendJson(res, 200, {
+      requestId: result.requestId,
+      codeLength: result.codeLength,
+      expiresAt: result.expiresAt,
+      requestCooldownSeconds: result.requestCooldownSeconds
+    });
+    return;
+  }
+
+  if (method === 'POST' && pathname === '/api/pair/terminal-request') {
+    if (!isLoopbackAddress(remoteAddress(req))) {
+      sendJson(res, 403, { error: 'Terminal pairing is only available from this computer' });
+      return;
+    }
+    const body = await readBody(req);
+    const result = await startPairingRequest({
+      deviceName: body.deviceName || 'Terminal pairing',
+      userAgent: 'CodexMobile CLI',
+      remoteAddress: remoteAddress(req),
+      revealCode: true,
+      securityOptions: {
+        ...securityOptions,
+        pairingMaxFailures: Math.max(securityOptions.pairingMaxFailures, 100),
+        pairingRequestCooldownMs: 0
+      }
+    });
+    if (!result.ok) {
+      if (result.retryAfterSeconds) {
+        res.setHeader('retry-after', String(result.retryAfterSeconds));
+      }
+      sendJson(res, result.statusCode || 400, {
+        error: result.error || 'Terminal pairing request failed',
+        retryAfterSeconds: result.retryAfterSeconds || null
+      });
+      return;
+    }
+    sendJson(res, 200, {
+      requestId: result.requestId,
+      code: result.code,
+      codeLength: result.codeLength,
+      expiresAt: result.expiresAt,
+      requestCooldownSeconds: result.requestCooldownSeconds
+    });
     return;
   }
 
   if (method === 'POST' && pathname === '/api/pair') {
     const body = await readBody(req);
-    const paired = await pairDevice({
+    const paired = await completePairingRequest({
+      requestId: body.requestId,
       code: body.code,
       deviceName: body.deviceName,
-      userAgent: req.headers['user-agent'],
-      remoteAddress: remoteAddress(req)
+      userAgent: req.headers['user-agent'] || '',
+      remoteAddress: remoteAddress(req),
+      securityOptions
     });
-    if (!paired) {
-      sendJson(res, 403, { error: 'Invalid pairing code' });
+    if (!paired.ok) {
+      if (paired.retryAfterSeconds) {
+        res.setHeader('retry-after', String(paired.retryAfterSeconds));
+      }
+      sendJson(res, paired.statusCode || 403, {
+        error: paired.error || 'Invalid pairing code',
+        retryAfterSeconds: paired.retryAfterSeconds || null
+      });
       return;
     }
-    sendJson(res, 200, paired);
+    setResponseCookie(res, buildAuthCookie(paired.token, authCookieOptions(req)));
+    res.setHeader('x-codexmobile-token-migrated', '1');
+    sendJson(res, 200, { success: true, device: paired.device });
     return;
   }
 
@@ -647,6 +804,45 @@ async function handleApi(req, res, url) {
   }
 
   if (!(await requireAuth(req, res, pathname, url))) {
+    return;
+  }
+
+  if (method === 'GET' && pathname === '/api/devices') {
+    const token = requestToken(req).token;
+    sendJson(res, 200, { devices: listDevices({ currentToken: token }) });
+    return;
+  }
+
+  if (method === 'POST' && pathname === '/api/logout') {
+    const token = extractCookieToken(req) || requestToken(req).token;
+    if (token) {
+      await revokeToken(token);
+    }
+    setResponseCookie(res, clearAuthCookie(authCookieOptions(req)));
+    res.setHeader('x-codexmobile-token-migrated', '1');
+    sendJson(res, 200, { success: true });
+    return;
+  }
+
+  const revokeMatch = pathname.match(/^\/api\/devices\/([^/]+)\/revoke$/);
+  if (method === 'POST' && revokeMatch) {
+    const result = await revokeDevice(decodeURIComponent(revokeMatch[1]));
+    if (!result.ok) {
+      sendJson(res, 404, { error: 'Device not found' });
+      return;
+    }
+    sendJson(res, 200, { success: true, deviceId: result.deviceId });
+    return;
+  }
+
+  const deleteDeviceMatch = pathname.match(/^\/api\/devices\/([^/]+)$/);
+  if (method === 'DELETE' && deleteDeviceMatch) {
+    const result = await revokeDevice(decodeURIComponent(deleteDeviceMatch[1]));
+    if (!result.ok) {
+      sendJson(res, 404, { error: 'Device not found' });
+      return;
+    }
+    sendJson(res, 200, { success: true, deviceId: result.deviceId });
     return;
   }
 
@@ -770,6 +966,26 @@ async function handleApi(req, res, url) {
 async function requestHandler(req, res) {
   const url = new URL(req.url || '/', `http://${req.headers.host || `127.0.0.1:${PORT}`}`);
   try {
+    const secureRequest = isRequestTransportSecure(req, securityOptions);
+    const requestSecurityOptions = {
+      ...securityOptions,
+      allowedOrigins: [...new Set([requestOrigin(req), ...(securityOptions.allowedOrigins || [])].filter(Boolean))]
+    };
+    setSecurityHeaders(res, { secure: secureRequest });
+    if (!requestMayUsePublicHttp(req, requestSecurityOptions)) {
+      sendJson(res, 403, { error: 'HTTPS is required for public access' });
+      return;
+    }
+    const originRejection = rejectUnsafeOrigin(req, requestSecurityOptions);
+    if (originRejection) {
+      sendJson(res, originRejection.statusCode, { error: originRejection.error });
+      return;
+    }
+    const fetchSiteRejection = rejectSuspiciousFetchSite(req);
+    if (fetchSiteRejection) {
+      sendJson(res, fetchSiteRejection.statusCode, { error: fetchSiteRejection.error });
+      return;
+    }
     if (url.pathname.startsWith('/api/')) {
       await handleApi(req, res, url);
       return;
@@ -796,10 +1012,18 @@ async function main() {
       socket.destroy();
       return;
     }
+    const requestSecurityOptions = {
+      ...securityOptions,
+      allowedOrigins: [...new Set([requestOrigin(req), ...(securityOptions.allowedOrigins || [])].filter(Boolean))]
+    };
+    if (!requestMayUsePublicHttp(req, requestSecurityOptions) || !sameOriginAllowed(req.headers.origin, requestSecurityOptions)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
 
-    const token = url.searchParams.get('token') || '';
-    const ok = await verifyToken(token, { remoteAddress: remoteAddress(req) });
-    if (!ok) {
+    const authResult = await authenticateRequest(req, null, { rotate: false });
+    if (!authResult.ok) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
@@ -814,8 +1038,12 @@ async function main() {
 
     wss.handleUpgrade(req, socket, head, async (ws) => {
       sockets.add(ws);
-      ws.on('close', () => sockets.delete(ws));
-      ws.send(JSON.stringify({ type: 'connected', status: await publicStatus(true) }));
+      registerSocket(authResult.tokenHash, ws);
+      ws.on('close', () => {
+        sockets.delete(ws);
+        unregisterSocket(authResult.tokenHash, ws);
+      });
+      ws.send(JSON.stringify({ type: 'connected', status: await publicStatus(true, req) }));
       ws.send(JSON.stringify(syncBridge.publicStatePayload()));
     });
   };
@@ -827,7 +1055,7 @@ async function main() {
 
   server.listen(PORT, HOST, () => {
     console.log(`CodexMobile listening on http://${HOST}:${PORT}`);
-    console.log(`Pairing code: ${getPairingCode()} (${auth.trustedDevices} trusted device(s)${auth.fixedPairingCode ? ', fixed' : ''})`);
+    console.log(`Trusted devices: ${auth.trustedDevices}. Run npm run pair to create a pairing code.`);
     console.log('Use Tailscale and open http://<this-pc-tailscale-ip>:3321 on iPhone.');
   });
 

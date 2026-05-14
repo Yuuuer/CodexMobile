@@ -167,7 +167,7 @@ test('rollout context state clears runtime after final assistant message without
 test('session message reader merges raw and collaboration activities only when requested', async () => {
   const calls = [];
   const messages = [
-    { id: 'message-1', role: 'user', content: 'hi', timestamp: '2026-05-08T01:00:00.000Z' }
+    { id: 'message-1', role: 'user', content: 'hi', timestamp: '2026-05-08T01:00:00.000Z', turnId: 'turn-1' }
   ];
   const reader = createSessionMessageReader({
     readDeletedMessageIds: async () => new Set(),
@@ -175,15 +175,15 @@ test('session message reader merges raw and collaboration activities only when r
       thread: { id: 'session-1', path: '/tmp/rollout.jsonl', turns: [{ id: 'turn-1' }] }
     }),
     messagesFromDesktopThread: (_thread, options) => {
-      calls.push(['messagesFromDesktopThread', options.includeActivity]);
+      calls.push(['messagesFromDesktopThread', options.includeActivity, [...(options.turnIds || [])]]);
       return [...messages];
     },
-    readRawSessionActivities: async (filePath, turns) => {
-      calls.push(['raw', filePath, turns.length]);
+    readRawSessionActivities: async (filePath, turns, options) => {
+      calls.push(['raw', filePath, turns.length, [...(options.turnIds || [])]]);
       return [{ turnId: 'turn-1', activity: { id: 'raw-1', kind: 'command_execution', timestamp: '2026-05-08T01:01:00.000Z' } }];
     },
-    readDesktopCollabActivities: async (filePath) => {
-      calls.push(['collab', filePath]);
+    readDesktopCollabActivities: async (filePath, options) => {
+      calls.push(['collab', filePath, [...(options.turnIds || [])]]);
       return [{ turnId: 'turn-1', activity: { id: 'collab-1', kind: 'agent_message', timestamp: '2026-05-08T01:02:00.000Z' } }];
     },
     removeFallbackActivitiesCoveredByRaw: (items, raw) => calls.push(['removeFallback', items.length, raw.length]),
@@ -200,17 +200,18 @@ test('session message reader merges raw and collaboration activities only when r
 
   const withoutActivity = await reader.readSessionMessages('session-1', { includeActivity: false });
   assert.deepEqual(withoutActivity.messages.map((message) => message.id), ['message-1']);
-  assert.deepEqual(calls, [['messagesFromDesktopThread', false]]);
+  assert.deepEqual(calls, [['messagesFromDesktopThread', false, []]]);
 
   calls.length = 0;
   const withActivity = await reader.readSessionMessages('session-1', { includeActivity: true });
   assert.deepEqual(withActivity.messages.map((message) => message.id), ['message-1', 'raw-1', 'collab-1']);
   assert.deepEqual(calls, [
-    ['messagesFromDesktopThread', true],
-    ['raw', '/tmp/rollout.jsonl', 1],
+    ['messagesFromDesktopThread', false, []],
+    ['messagesFromDesktopThread', true, ['turn-1']],
+    ['raw', '/tmp/rollout.jsonl', 1, ['turn-1']],
     ['removeFallback', 1, 1],
     ['upsert', 'turn-1', 'raw-1'],
-    ['collab', '/tmp/rollout.jsonl'],
+    ['collab', '/tmp/rollout.jsonl', ['turn-1']],
     ['upsert', 'turn-1', 'collab-1'],
     ['sort', 3]
   ]);

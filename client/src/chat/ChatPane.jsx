@@ -27,6 +27,9 @@ export function ChatPane({
   running,
   activeRuntimeStartedAt = null,
   now,
+  hasMoreBefore = false,
+  loadingOlder = false,
+  onLoadOlderMessages,
   onPreviewImage,
   onDeleteMessage,
   onImplementPlan,
@@ -149,6 +152,19 @@ export function ChatPane({
   return (
     <section className="chat-pane" ref={paneRef}>
       <div className="chat-content" ref={contentRef}>
+        {hasMoreBefore ? (
+          <div className="message-history-gate">
+            <button
+              type="button"
+              className="message-history-button"
+              onClick={onLoadOlderMessages}
+              disabled={loadingOlder}
+            >
+              {loadingOlder ? <Loader2 className="spin" size={15} /> : null}
+              <span>{loadingOlder ? '正在加载更早消息' : '加载更早消息'}</span>
+            </button>
+          </div>
+        ) : null}
         {renderItems.map((item) => {
           if (item.type === 'fileSummary') {
             return (

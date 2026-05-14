@@ -627,7 +627,24 @@ function rawSessionActivitiesFromFunctionCall(payload, outputRecord, turns, sequ
   return [];
 }
 
-export function rawSessionActivitiesFromJsonl(content, turns = []) {
+function normalizeTurnIdFilter(turnIds = null) {
+  if (!turnIds) {
+    return null;
+  }
+  const values = turnIds instanceof Set ? [...turnIds] : Array.isArray(turnIds) ? turnIds : [turnIds];
+  const normalized = values.map((value) => String(value || '').trim()).filter(Boolean);
+  return normalized.length ? new Set(normalized) : null;
+}
+
+function activityMatchesTurnFilter(item, turnFilter) {
+  if (!turnFilter) {
+    return true;
+  }
+  return turnFilter.has(String(item?.turnId || '').trim());
+}
+
+export function rawSessionActivitiesFromJsonl(content, turns = [], { turnIds = null } = {}) {
+  const turnFilter = normalizeTurnIdFilter(turnIds);
   const calls = [];
   const customCalls = [];
   const messages = [];
@@ -710,23 +727,25 @@ export function rawSessionActivitiesFromJsonl(content, turns = []) {
       rawActivities.push(item);
     }
   }
-  return applyRawActivitySegments(rawActivities, messages, turns).sort((a, b) => {
-    const left = Number(a.activity.sequence);
-    const right = Number(b.activity.sequence);
-    if (Number.isFinite(left) && Number.isFinite(right) && left !== right) {
-      return left - right;
-    }
-    return new Date(a.activity.timestamp || 0) - new Date(b.activity.timestamp || 0);
-  });
+  return applyRawActivitySegments(rawActivities, messages, turns)
+    .filter((item) => activityMatchesTurnFilter(item, turnFilter))
+    .sort((a, b) => {
+      const left = Number(a.activity.sequence);
+      const right = Number(b.activity.sequence);
+      if (Number.isFinite(left) && Number.isFinite(right) && left !== right) {
+        return left - right;
+      }
+      return new Date(a.activity.timestamp || 0) - new Date(b.activity.timestamp || 0);
+    });
 }
 
-export async function readRawSessionActivities(filePath, turns) {
+export async function readRawSessionActivities(filePath, turns, options = {}) {
   if (!filePath) {
     return [];
   }
   try {
     const content = await fs.readFile(filePath, 'utf8');
-    return rawSessionActivitiesFromJsonl(content, turns);
+    return rawSessionActivitiesFromJsonl(content, turns, options);
   } catch (error) {
     if (error.code !== 'ENOENT') {
       console.warn('[sessions] Failed to read raw desktop activity:', error.message);
@@ -735,10 +754,11 @@ export async function readRawSessionActivities(filePath, turns) {
   }
 }
 
-export async function readDesktopCollabActivities(filePath) {
+export async function readDesktopCollabActivities(filePath, { turnIds = null } = {}) {
   if (!filePath) {
     return [];
   }
+  const turnFilter = normalizeTurnIdFilter(turnIds);
   const activitiesByTurn = new Map();
   let currentTurnId = null;
 
@@ -781,6 +801,9 @@ export async function readDesktopCollabActivities(filePath) {
         continue;
       }
       if (payload.type === 'collab_agent_spawn_end') {
+        if (turnFilter && !turnFilter.has(String(currentTurnId || ''))) {
+          continue;
+        }
         const state = ensureTurn(currentTurnId, entry.timestamp);
         if (!state || !payload.new_thread_id) {
           continue;

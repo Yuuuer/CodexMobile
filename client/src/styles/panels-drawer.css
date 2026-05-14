@@ -1706,6 +1706,10 @@
   gap: 12px;
 }
 
+.settings-row.is-muted {
+  opacity: 0.58;
+}
+
 button.settings-row.is-actionable:active {
   background: var(--subpage-soft);
 }
@@ -1751,6 +1755,11 @@ button.settings-row.is-actionable:active {
 .settings-row-arrow {
   flex: 0 0 auto;
   color: var(--subpage-muted);
+  transition: transform 160ms ease;
+}
+
+.settings-row-arrow.is-open {
+  transform: rotate(90deg);
 }
 
 .settings-segmented-control {

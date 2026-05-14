@@ -12,7 +12,7 @@
  * Outward: App.jsx 根编排。
  */
 
-import { apiFetch, getToken, websocketUrl } from '../api.js';
+import { apiFetch, websocketUrl } from '../api.js';
 import { applySessionRenameToProjectSessions } from '../session-live-refresh.js';
 import { mergeModelSettingsIntoStatus, shouldApplyModelSettings } from './model-sync.js';
 import { normalizeContextStatus } from './context-status.js';
@@ -83,10 +83,11 @@ export function useAppWebSocket({
   markSessionCompleteNotice,
   markTurnCompleted,
   scheduleTurnRefresh,
-  upsertSessionInProject
+  upsertSessionInProject,
+  onAuthRevoked
 }) {
   useEffect(() => {
-    if (!authenticated || !getToken()) {
+    if (!authenticated) {
       setConnectionState('disconnected');
       return undefined;
     }
@@ -215,8 +216,13 @@ export function useAppWebSocket({
       wsRef.current = ws;
 
       ws.onopen = () => setConnectionState('connecting');
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         setConnectionState('disconnected');
+        if (event.code === 1008 || String(event.reason || '').toLowerCase().includes('revoked')) {
+          stopped = true;
+          onAuthRevoked?.();
+          return;
+        }
         if (!stopped) {
           reconnectTimer = window.setTimeout(connect, 1200);
         }

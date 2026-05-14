@@ -1,7 +1,7 @@
 /**
  * 主侧栏抽屉：项目 / 会话列表、配额与设置入口、归档与子代理等。
  *
- * Keywords: drawer, sidebar, sessions, projects, settings, archive-box, desktop-refresh
+ * Keywords: drawer, sidebar, sessions, projects, settings, archive-box, desktop-refresh, security-devices
  *
  * Exports:
  * - Drawer — 侧栏根组件。
@@ -92,6 +92,7 @@ export function Drawer({
   setTheme,
   runtimeDebug,
   desktopRefresh,
+  onLoggedOut,
   refreshStatus
 }) {
   const [drawerView, setDrawerView] = useState('main');
@@ -410,6 +411,7 @@ export function Drawer({
         desktopRefreshSaving={desktopRefreshSaving}
         desktopRefreshError={desktopRefreshError}
         onDesktopRefreshToggle={handleDesktopRefreshToggle}
+        onLoggedOut={onLoggedOut}
         appVersion={appVersion}
       />
     );

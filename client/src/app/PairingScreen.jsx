@@ -1,38 +1,67 @@
 /**
- * 设备配对门禁：输入桌面端展示码，调用 `/api/pair` 换取 token 后通知上层进入主应用。
+ * 设备配对门禁：接收终端配对链接或手动输入终端配对码完成 Cookie 登录。
  *
- * Keywords: pairing, device-auth, token
+ * Keywords: pairing, device-auth, cookie, terminal-code
  *
  * Exports:
  * - default — `PairingScreen`（未认证时由 `App` 全屏展示）。
  *
- * Inward: `api`（`apiFetch`、`setToken`）。
+ * Inward: `pairing-flow`。
  *
  * Outward: `App.jsx` 在 `authenticated === false` 时渲染。
  */
 
 import { Check, Loader2, Monitor } from 'lucide-react';
-import { useState } from 'react';
-import { apiFetch, setToken } from '../api.js';
+import { useEffect, useRef, useState } from 'react';
+import {
+  completePairing,
+  normalizePairingCode,
+  pairingRequestFromSearch
+} from '../pairing-flow.js';
 
 export default function PairingScreen({ onPaired }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [pairing, setPairing] = useState(false);
+  const [inputActive, setInputActive] = useState(false);
+  const autoPairRef = useRef(pairingRequestFromSearch(globalThis.location?.search || ''));
+  const formRef = useRef(null);
+
+  useEffect(() => {
+    const fromSearch = autoPairRef.current;
+    if (!fromSearch) {
+      return;
+    }
+    setCode(fromSearch.code);
+    if (typeof globalThis.window?.history?.replaceState === 'function') {
+      globalThis.window.history.replaceState(null, '', '/');
+    }
+  }, []);
+
+  useEffect(() => {
+    const fromSearch = autoPairRef.current;
+    if (!fromSearch || pairing) {
+      return;
+    }
+    autoPairRef.current = null;
+    setPairing(true);
+    setError('');
+    completePairing({ requestId: fromSearch.requestId, code: fromSearch.code })
+      .then(() => onPaired())
+      .catch((err) => setError(err.message || '自动配对失败，请重新运行 npm run pair'))
+      .finally(() => setPairing(false));
+  }, [onPaired, pairing]);
 
   async function handlePair(event) {
     event.preventDefault();
+    if (!code.trim()) {
+      setError('请输入配对码');
+      return;
+    }
     setPairing(true);
     setError('');
     try {
-      const result = await apiFetch('/api/pair', {
-        method: 'POST',
-        body: {
-          code,
-          deviceName: navigator.platform || 'iPhone'
-        }
-      });
-      setToken(result.token);
+      await completePairing({ code });
       onPaired();
     } catch (err) {
       setError(err.message);
@@ -41,8 +70,18 @@ export default function PairingScreen({ onPaired }) {
     }
   }
 
+  function scrollFormIntoView() {
+    formRef.current?.scrollIntoView?.({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+  }
+
+  function handleCodeFocus() {
+    setInputActive(true);
+    window.setTimeout(scrollFormIntoView, 120);
+    window.setTimeout(scrollFormIntoView, 360);
+  }
+
   return (
-    <main className="pairing-screen">
+    <main className={inputActive ? 'pairing-screen is-input-active' : 'pairing-screen'}>
       <div className="pairing-mark">
         <Monitor size={30} />
       </div>
@@ -55,16 +94,19 @@ export default function PairingScreen({ onPaired }) {
         <span>完整执行过程</span>
         <span>私有网络访问</span>
       </div>
-      <p className="pairing-note">输入电脑端启动日志里的 6 位配对码。</p>
-      <form className="pairing-form" onSubmit={handlePair}>
+      <p className="pairing-note">
+        在电脑终端运行 npm run pair，然后打开终端链接或输入终端配对码。
+      </p>
+      <form ref={formRef} className="pairing-form" onSubmit={handlePair}>
         <input
-          inputMode="numeric"
-          maxLength={6}
-          placeholder="6 位配对码"
+          inputMode="text"
+          placeholder="10 位配对码"
           value={code}
-          onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+          onBlur={() => setInputActive(false)}
+          onFocus={handleCodeFocus}
+          onChange={(event) => setCode(normalizePairingCode(event.target.value, 10))}
         />
-        <button type="submit" disabled={code.length !== 6 || pairing}>
+        <button type="submit" disabled={!code.trim() || pairing}>
           {pairing ? <Loader2 className="spin" size={18} /> : <Check size={18} />}
           连接
         </button>

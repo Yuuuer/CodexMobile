@@ -18,8 +18,12 @@ import {
   autoTitlePatch,
   createDraftSession,
   emptyContextStatus,
+  emptyMessagePage,
   isDraftSession,
+  messagePageFromResponse,
+  prependUniqueMessages,
   resolveNewConversationProject,
+  SESSION_MESSAGES_PAGE_SIZE,
   sessionMessagesApiPath
 } from './session-utils.js';
 
@@ -40,6 +44,7 @@ export function useSessionActions({
   setSelectedSession,
   setSessionsByProject,
   setMessages,
+  setMessagePage,
   setSessionLoadingId,
   setSessionLoadError,
   setContextStatus,
@@ -67,6 +72,7 @@ export function useSessionActions({
     if (projectChanged) {
       setSelectedSession(null);
       setMessages([]);
+      setMessagePage(emptyMessagePage());
       setSessionLoadingId(null);
       setSessionLoadError('');
       setContextStatus(emptyContextStatus());
@@ -85,12 +91,14 @@ export function useSessionActions({
     if (isDraftSession(session)) {
       setSessionLoadingId(null);
       setMessages([]);
+      setMessagePage(emptyMessagePage());
       setContextStatus(emptyContextStatus());
       setDrawerOpen(false);
       return;
     }
     setSessionLoadingId(requestedSessionId);
     setMessages([]);
+    setMessagePage(emptyMessagePage());
     setContextStatus(normalizeContextStatus(session?.context || defaultStatus.context, defaultStatus.context));
     setDrawerOpen(false);
     try {
@@ -99,6 +107,7 @@ export function useSessionActions({
         return;
       }
       setMessages(data.messages || []);
+      setMessagePage(messagePageFromResponse(data));
       setContextStatus(normalizeContextStatus(data.context || session.context || defaultStatus.context, defaultStatus.context));
     } catch (error) {
       if (selectedSessionRef.current?.id === requestedSessionId) {
@@ -236,6 +245,7 @@ export function useSessionActions({
       if (selectedSessionRef.current?.id === session.id) {
         setSelectedSession(null);
         setMessages([]);
+        setMessagePage(emptyMessagePage());
         setSessionLoadingId(null);
         setSessionLoadError('');
         setAttachments([]);
@@ -317,13 +327,62 @@ export function useSessionActions({
     setExpandedProjectIds((current) => ({ ...current, [project.id]: true }));
     setSessionsByProject((current) => upsertSessionInProject(current, project.id, draft));
     setMessages([]);
+    setMessagePage(emptyMessagePage());
     setAttachments([]);
     setDrawerOpen(false);
+  }
+
+  async function handleLoadOlderMessages() {
+    const session = selectedSessionRef.current;
+    if (!session?.id || isDraftSession(session)) {
+      return;
+    }
+
+    let request = null;
+    setMessagePage((current) => {
+      const page = current || emptyMessagePage();
+      if (!page.hasMoreBefore || page.loadingOlder) {
+        return page;
+      }
+      const currentOffset = Math.max(0, Number(page.offset) || 0);
+      const nextOffset = Math.max(0, currentOffset - SESSION_MESSAGES_PAGE_SIZE);
+      request = {
+        offset: nextOffset,
+        limit: Math.max(1, currentOffset - nextOffset)
+      };
+      return { ...page, loadingOlder: true };
+    });
+    if (!request) {
+      return;
+    }
+
+    const sessionId = session.id;
+    try {
+      const data = await apiFetch(sessionMessagesApiPath(sessionId, {
+        limit: request.limit,
+        offset: request.offset,
+        latest: false
+      }));
+      if (selectedSessionRef.current?.id !== sessionId) {
+        return;
+      }
+      setMessages((current) => prependUniqueMessages(current, data.messages || []));
+      setMessagePage(messagePageFromResponse(data));
+      setContextStatus((current) =>
+        normalizeContextStatus(data.context || current || session.context || defaultStatus.context, defaultStatus.context)
+      );
+    } catch (error) {
+      if (selectedSessionRef.current?.id === sessionId) {
+        setSessionLoadError(error.message || '加载更早消息失败');
+      }
+      setMessagePage((current) => ({ ...(current || emptyMessagePage()), loadingOlder: false }));
+    }
   }
 
   return {
     handleToggleProject,
     handleSelectSession,
+    handleLoadOlderMessages,
     handleRenameSession,
     handleDeleteSession,
     handleDeleteMessage,

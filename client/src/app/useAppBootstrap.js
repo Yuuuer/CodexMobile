@@ -15,7 +15,9 @@ import { useCallback } from 'react';
 import { apiFetch, clearToken } from '../api.js';
 import {
   emptyContextStatus,
+  emptyMessagePage,
   isDraftSession,
+  messagePageFromResponse,
   sessionMessagesApiPath
 } from './session-utils.js';
 import { normalizeContextStatus } from './context-status.js';
@@ -33,6 +35,7 @@ export function useAppBootstrap({
   setAuthenticated,
   setSelectedSession,
   setMessages,
+  setMessagePage,
   setContextStatus,
   setLoadingProjectId,
   setSessionsByProject,
@@ -61,6 +64,7 @@ export function useAppBootstrap({
       selectedSessionRef.current = null;
       setSelectedSession(null);
       setMessages([]);
+      setMessagePage(emptyMessagePage());
       setContextStatus(emptyContextStatus());
       return;
     }
@@ -94,6 +98,7 @@ export function useAppBootstrap({
         if (isDraftSession(next)) {
           setSelectedSession(next);
           setMessages([]);
+          setMessagePage(emptyMessagePage());
           setContextStatus(emptyContextStatus());
           return;
         }
@@ -102,6 +107,7 @@ export function useAppBootstrap({
         const messageData = await apiFetch(sessionMessagesApiPath(next.id));
         if (selectedSessionRef.current?.id === next.id) {
           setMessages(messageData.messages || []);
+          setMessagePage(messagePageFromResponse(messageData));
           setContextStatus(normalizeContextStatus(messageData.context || next.context || defaultStatus.context, defaultStatus.context));
         }
         return;
@@ -109,6 +115,7 @@ export function useAppBootstrap({
       selectedSessionRef.current = null;
       setSelectedSession(null);
       setMessages([]);
+      setMessagePage(emptyMessagePage());
       setContextStatus(emptyContextStatus());
     } finally {
       if (!settings.silent) {
@@ -120,6 +127,7 @@ export function useAppBootstrap({
     selectedSessionRef,
     setContextStatus,
     setLoadingProjectId,
+    setMessagePage,
     setMessages,
     setSelectedSession,
     setSessionsByProject
