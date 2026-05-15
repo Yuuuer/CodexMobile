@@ -4,6 +4,23 @@ All notable changes to CodexMobile are tracked here.
 
 ## Unreleased
 
+## [2.0.2] - 2026-05-15
+
+### Added
+
+- Added a GitHub Release self-update flow in settings, including latest-release checks, update status, guarded tag application, dependency install, and rebuild steps.
+- Added mobile interaction request cards for Codex app-server prompts, command/file approvals, permission requests, and MCP elicitation so mobile can respond while a turn is running.
+
+### Changed
+
+- Improved permission-mode labels and fallback normalization for safer mobile composer settings.
+- Updated the package version to `2.0.2`.
+
+### Fixed
+
+- Hardened session path handling and static-file serving so mobile routes and local assets stay stable across direct file and browser requests.
+- Added sync coverage for interaction-request and interaction-resolved events so pending requests are inserted and removed consistently in chat.
+
 ## [2.0.1] - 2026-05-15
 
 ### Fixed
