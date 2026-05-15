@@ -26,3 +26,7 @@
 2026-05-12 20:24:48:381 :已完成接口收敛：前端 `ActionsPanel` 已对齐后端 `GET/POST/PATCH/DELETE /api/actions` 与 `POST /api/actions/run` 的最终字段形状，当前仅剩页面级手动验收未执行。
 2026-05-12 20:55:28:051 :已开始只读审查：重读 `docs/lessons.md`、`.gitignore`、任务过程文档，并锁定 `client/src/panels/ActionsPanel.jsx`、`client/src/actions-panel-actions.js`、`client/src/actions-panel-state.js`、`client/src/app/App.jsx`、`client/src/panels/TopBar.jsx`、相关测试与样式作为审查范围。
 2026-05-12 20:55:20:026 :已完成审查启动序列：重读 `docs/lessons.md`、核对 `.gitignore` 与过程文档位置合规，并登记本次只读后端审查任务。
+2026-05-12 21:07:03:581 :已完成前端切片审查：逐项核对 `ActionsPanel` 状态流、`TopBar/App` 接线、前端请求配置、后端 `actions` 路由返回形状，以及 `actions-panel-actions/state` 与 `app-state` 测试覆盖范围，已定位执行失败误报成功、异步读取串扰旧项目状态、运行中缺少安全禁用与组件级测试缺口。
+2026-05-12 21:03:25:542 :已完成并发写复现：通过注入延迟 `fsModule.writeFile()` 并并发发起两次 `createAction()`，确认两次请求都会成功返回，但最终 `environment.toml` 只保留最后一次写入，证明当前 revision 校验不是原子并发保护。
+2026-05-12 21:03:25:542 :已完成路由异常复现：向 `POST /api/actions/run` 发送非法 JSON 时，`createActionsRouteHandler()` Promise 直接以 `Invalid JSON body` 拒绝，说明 `readBody()` 异常绕过了 route 内部错误映射。
+2026-05-12 21:05:28:136 :已完成 Windows 兼容与环境泄露复现：真实调用默认 `powershell.exe` 运行 `Write-Output ('你' * 20)` 时返回内容出现乱码；同样用 `Write-Output $env:CODEX_REVIEW_SECRET` 可直接读出服务端环境变量，证明子进程继承了完整 `process.env`。

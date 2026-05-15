@@ -23,3 +23,11 @@
 2026-05-12 20:24:48:381 :实现结论：后端已直接兼容项目内 `.codex\\environments\\environment.toml` 的 `[[actions]]`，支持读取、执行、新增、编辑、删除、revision 冲突校验、平台限制和单项目运行锁；前端已完成与该接口形状的对齐。
 2026-05-12 20:24:48:381 :剩余风险：本轮没有使用 Browser 插件做页面级自动验收，因此真实移动端交互、滚动、按钮态和多行命令展示仍需要人工手动验证；若发现问题，应优先校正面板交互而不是改动 TOML 协议。
 2026-05-12 20:55:28:051 :审查基线：本次仅做代码审查不改业务实现；由于按仓库要求禁用 Browser 插件，所有交互结论仅基于源码、测试与未提交差异，页面级表现仍需人工手动验证。
+2026-05-12 21:07:03:581 :审查结论一：`ActionsPanel` 在 `run` 成功收到 HTTP 200 后，不区分 `exitCode !== 0`、`timedOut` 或纯 stderr 场景，仍统一弹 success toast，并用绿色 `git-result` + `Check` 图标展示结果；后端 `POST /api/actions/run` 的既有测试表明命令执行结果通过 200 + `run.exitCode` 返回，因此前端当前会把“执行失败”误报成“已执行成功”。
+2026-05-12 21:07:03:581 :审查结论二：`ActionsPanel` 的读取流程没有请求代号或清理逻辑，`loadActions()` 的旧请求可在面板关闭后、或切到其他项目再重开后回写 `state`；由于组件保持挂载且打开时不先清空上一次 `state`，用户会看到旧项目的 action 列表/路径，最坏情况下还能对当前项目发起带着旧 revision 的请求。
+2026-05-12 21:07:03:581 :审查结论三：`TopBar/App` 新增的 Actions 入口绕过了现有 `selectedRunning` 安全门禁，Git 在运行中会被禁用，但 Actions 仍可打开、编辑配置并直接执行 shell 命令；这会让会话执行中的工作区与用户手动 action 并发修改，风险高于 Git。
+2026-05-12 21:07:03:581 :测试结论：当前新增测试只覆盖纯函数和 reducer 接线，没有任何组件级场景去验证 `ActionsPanel` 的失败执行呈现、异步响应乱序、或运行中禁用态，因此上述三类回归都不会被现有测试拦住。
+2026-05-12 21:05:28:166 :审查结论：`server/actions-service.js` 的 `persist()` 只做“读当前 revision -> 直接 writeFile”两步，没有任何同项目写锁或原子替换；并发 `createAction/updateAction/deleteAction` 可在相同 revision 下同时成功，最后一次写入覆盖前一次，造成静默丢操作。
+2026-05-12 21:05:28:166 :审查结论：`server/actions-routes.js` 在 `POST/PATCH/DELETE` 分支里先 `await readBody(req)` 再进入 `try/catch`，所以非法 JSON 或超大请求体不会被映射为 4xx，而是冒泡到 `server/index.js` 的顶层 `catch`，最终以 500 返回。
+2026-05-12 21:05:28:166 :审查结论：默认 `powershell.exe` runner 直接把 `stdout/stderr` Buffer 以 `String(chunk)` 按 UTF-8 解码，在 Windows 上会把中文等非 ASCII 输出解码成乱码；当前测试只断言 ASCII 假数据，没有覆盖真实 runner 的编码行为。
+2026-05-12 21:05:28:166 :审查结论：默认 runner 以 `env: process.env` 启动 action 子进程，项目内 `environment.toml` 里的命令一旦被用户触发，就能直接读取服务端进程的全部环境变量和密钥；这属于不必要的高权限继承，当前测试也没有防回归覆盖。
