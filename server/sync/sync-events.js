@@ -179,6 +179,22 @@ export function normalizeLegacyPayloadToSyncEvents(payload = {}) {
       })
     ];
   }
+  if (payload.type === 'interaction-request') {
+    return [
+      baseEvent(payload, 'interaction.requested', {
+        interaction: payload.interaction || null,
+        status: payload.status || 'pending'
+      })
+    ];
+  }
+  if (payload.type === 'interaction-resolved') {
+    return [
+      baseEvent(payload, 'interaction.resolved', {
+        interactionId: payload.interactionId || payload.id || null,
+        status: payload.status || 'completed'
+      })
+    ];
+  }
   if (payload.type === 'context-status-update') {
     return [baseEvent(payload, 'context.updated', { context: { ...payload } })];
   }

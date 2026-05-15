@@ -44,6 +44,7 @@ export function runQueuedHeadlessChatJob({
   rememberLiveSession,
   notifyDesktopThreadListChanged,
   triggerDesktopRefreshForThread,
+  requestCodexInteraction,
   emitJobEvent,
   scheduleAutoNameCompletedSession,
   onQueueDrained
@@ -123,7 +124,10 @@ export function runQueuedHeadlessChatJob({
       serviceTier: job.serviceTier,
       permissionMode: job.permissionMode,
       collaborationMode: job.collaborationMode || null,
-      turnId: job.turnId
+      turnId: job.turnId,
+      onCodexServerRequest: requestCodexInteraction
+        ? (appMessage, context) => requestCodexInteraction(job, appMessage, context)
+        : null
     },
     (payload) => {
       const eventPayload = {

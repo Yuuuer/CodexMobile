@@ -34,6 +34,15 @@ const TURN_INACTIVITY_TIMEOUT_MS = parseTurnTimeoutMs(
   process.env.CODEXMOBILE_TURN_INACTIVITY_TIMEOUT_MS,
   DEFAULT_TURN_INACTIVITY_TIMEOUT_MS
 );
+const INTERACTIVE_SERVER_REQUEST_METHODS = new Set([
+  'item/commandExecution/requestApproval',
+  'item/fileChange/requestApproval',
+  'item/permissions/requestApproval',
+  'item/tool/requestUserInput',
+  'mcpServer/elicitation/request',
+  'applyPatchApproval',
+  'execCommandApproval'
+]);
 
 function parseTurnTimeoutMs(value, fallbackMs = DEFAULT_TURN_TIMEOUT_MS) {
   const timeoutMs = Number(value);
@@ -830,7 +839,7 @@ function abortError() {
   return error;
 }
 
-export async function runCodexTurn({ sessionId, draftSessionId, projectPath, message, attachments = [], selectedSkills = [], model, reasoningEffort, serviceTier, permissionMode, collaborationMode = null, turnId: providedTurnId }, emit) {
+export async function runCodexTurn({ sessionId, draftSessionId, projectPath, message, attachments = [], selectedSkills = [], model, reasoningEffort, serviceTier, permissionMode, collaborationMode = null, turnId: providedTurnId, onCodexServerRequest = null }, emit) {
   const workingDirectory = await ensureAsciiWorkingDirectory(projectPath);
   const { sandboxMode, approvalPolicy } = mapPermissionMode(permissionMode);
   const feishuSkillKeys = detectFeishuSkillKeys(message);
@@ -926,6 +935,16 @@ export async function runCodexTurn({ sessionId, draftSessionId, projectPath, mes
         resetTurnInactivityTimeout();
         if (appMessage?.method === 'item/plan/requestImplementation') {
           emitPlanImplementationRequest(appMessage, currentSessionId || sessionId || draftSessionId, turnId, emit);
+        }
+        if (typeof onCodexServerRequest === 'function' && INTERACTIVE_SERVER_REQUEST_METHODS.has(appMessage?.method)) {
+          const result = await onCodexServerRequest(appMessage, {
+            sessionId: currentSessionId || sessionId || draftSessionId || '',
+            turnId,
+            projectPath: workingDirectory
+          });
+          if (result !== null && result !== undefined) {
+            return result;
+          }
         }
         return defaultServerRequestResult(appMessage);
       },

@@ -111,6 +111,39 @@ test('assistant plan updates preserve plan implementation metadata', () => {
   });
 });
 
+test('interaction request payloads become non-runtime sync events with interaction details', () => {
+  const [requested] = normalizeLegacyPayloadToSyncEvents({
+    type: 'interaction-request',
+    projectId: 'project-1',
+    sessionId: 'session-1',
+    turnId: 'turn-1',
+    interaction: {
+      id: 'interaction-1',
+      kind: 'user_input',
+      title: '检查方式',
+      questions: [{ id: 'check_method', question: '怎么检查？', options: [] }]
+    }
+  });
+
+  assert.equal(requested.eventType, 'interaction.requested');
+  assert.equal(requested.interaction.id, 'interaction-1');
+  assert.equal(requested.interaction.questions[0].id, 'check_method');
+
+  const store = createSyncStore();
+  store.applyEvent(requested);
+  assert.deepEqual(store.snapshot().runtimeById, {});
+
+  const [resolved] = normalizeLegacyPayloadToSyncEvents({
+    type: 'interaction-resolved',
+    sessionId: 'session-1',
+    turnId: 'turn-1',
+    interactionId: 'interaction-1',
+    status: 'completed'
+  });
+  assert.equal(resolved.eventType, 'interaction.resolved');
+  assert.equal(resolved.interactionId, 'interaction-1');
+});
+
 test('sessions synced and rename events update sidebar projection data', () => {
   const store = createSyncStore();
   const [synced] = normalizeLegacyPayloadToSyncEvents({

@@ -45,5 +45,6 @@ test('permission options hide danger full access unless backend enables it', () 
     'acceptEdits',
     'bypassPermissions'
   ]);
+  assert.equal(normalizePermissionModeForSecurity('legacyExtraMode', { dangerFullAccessEnabled: false }), 'default');
   assert.equal(normalizePermissionModeForSecurity('bypassPermissions', { dangerFullAccessEnabled: false }), 'default');
 });

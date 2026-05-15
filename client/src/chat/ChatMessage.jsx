@@ -1,12 +1,12 @@
 /**
- * 单条聊天消息壳层：用户/助手复制、结果尾部内容、活动气泡、计划消息与图片条分发，并稳定普通消息重渲染。
+ * 单条聊天消息壳层：用户/助手复制、活动气泡、计划/交互请求与图片条分发，并稳定普通消息重渲染。
  *
  * Keywords: ChatMessage, copy, plan, activity, memo
  *
  * Exports:
  * - ChatMessage — 按 role 路由到 ActivityMessage、PlanMessage 或标准气泡。
  *
- * Inward: session-utils、MarkdownContent、PlanMessage、ActivityMessage、ImagePreview。
+ * Inward: session-utils、MarkdownContent、PlanMessage、InteractionRequestMessage、ActivityMessage、ImagePreview。
  *
  * Outward: ChatPane.jsx
  */
@@ -18,6 +18,7 @@ import { copyTextToClipboard } from '../utils/clipboard.js';
 import { ActivityMessage } from './ActivityMessage.jsx';
 import { MessageContent, splitMessageImages } from './MarkdownContent.jsx';
 import { PlanMessage } from './PlanMessage.jsx';
+import { InteractionRequestMessage } from './InteractionRequestMessage.jsx';
 import { UserImageStrip } from './ImagePreview.jsx';
 
 function ChatMessageView({
@@ -55,6 +56,9 @@ function ChatMessageView({
         onAdjustPlan={onAdjustPlan}
       />
     );
+  }
+  if (message.role === 'interaction_request') {
+    return <InteractionRequestMessage message={message} />;
   }
   const isUser = message.role === 'user';
   const isGuided = isUser && (message.guided || message.kind === 'guided_user');

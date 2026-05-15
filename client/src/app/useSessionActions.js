@@ -6,12 +6,13 @@
  * Exports:
  * - `useSessionActions` — 返回会话相关 `handle*` 的 hook。
  *
- * Inward: `api`；`session-utils`、`context-status`、`shared/session-title`。
+ * Inward: `api`；`session-utils`、`context-status`、`interaction-model`、`shared/session-title`。
  *
  * Outward: `App.jsx` 注入侧栏与聊天操作。
  */
 
 import { apiFetch } from '../api.js';
+import { upsertInteractionRequestMessage } from '../chat/interaction-model.js';
 import { sessionTitleFromConversation } from '../../../shared/session-title.js';
 import { normalizeContextStatus } from './context-status.js';
 import {
@@ -106,7 +107,15 @@ export function useSessionActions({
       if (selectedSessionRef.current?.id !== requestedSessionId) {
         return;
       }
-      setMessages(data.messages || []);
+      const pendingInteractions = await apiFetch(`/api/chat/interactions?sessionId=${encodeURIComponent(session.id)}`)
+        .then((result) => result.interactions || [])
+        .catch(() => []);
+      setMessages(
+        pendingInteractions.reduce(
+          (current, interaction) => upsertInteractionRequestMessage(current, { interaction, sessionId: session.id, turnId: interaction.turnId }),
+          data.messages || []
+        )
+      );
       setMessagePage(messagePageFromResponse(data));
       setContextStatus(normalizeContextStatus(data.context || session.context || defaultStatus.context, defaultStatus.context));
     } catch (error) {

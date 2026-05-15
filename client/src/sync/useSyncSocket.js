@@ -1,12 +1,12 @@
 /**
- * 统一同步 WebSocket 消费器：优先处理 sync-event/sync-state，并把旧 UI 直连降级为兼容层。
+ * 统一同步 WebSocket 消费器：处理 sync-event/sync-state，并把消息、活动与交互请求投影到 UI。
  *
  * Keywords: sync-socket, websocket, runtime, messages, reducer
  *
  * Exports:
  * - applySyncSocketPayload — 在 useAppWebSocket 中消费统一同步 payload。
  *
- * Inward（本模块依赖/组装的关键符号）: sync-reducer、activity-model、message-identity、context-status。
+ * Inward（本模块依赖/组装的关键符号）: sync-reducer、activity-model、interaction-model、message-identity、context-status。
  *
  * Outward（谁在用/调用场景）: app/useAppWebSocket.js。
  *
@@ -27,6 +27,10 @@ import {
   removeStalePlanRequestsAfterUserMessages,
   upsertStatusMessage
 } from '../chat/activity-model.js';
+import {
+  resolveInteractionRequestMessage,
+  upsertInteractionRequestMessage
+} from '../chat/interaction-model.js';
 import { sameUserMessageContent } from '../chat/message-identity.js';
 import { mergeContextStatus } from '../app/context-status.js';
 
@@ -319,6 +323,16 @@ export function applySyncSocketPayload(payload, context) {
         : current,
       event.activity
     ));
+    return true;
+  }
+
+  if (event.eventType === 'interaction.requested' && event.interaction && syncEventMatchesCurrent(event, context.selectedSessionRef)) {
+    context.setMessages((current) => upsertInteractionRequestMessage(current, event));
+    return true;
+  }
+
+  if (event.eventType === 'interaction.resolved' && syncEventMatchesCurrent(event, context.selectedSessionRef)) {
+    context.setMessages((current) => resolveInteractionRequestMessage(current, event));
     return true;
   }
 

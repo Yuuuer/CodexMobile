@@ -15,8 +15,8 @@
 
 export const PERMISSION_OPTIONS = [
   { value: 'default', label: '默认权限' },
-  { value: 'acceptEdits', label: '自动接受编辑' },
-  { value: 'bypassPermissions', label: '完全访问', danger: true }
+  { value: 'acceptEdits', label: '自动审查' },
+  { value: 'bypassPermissions', label: '完全访问权限', danger: true }
 ];
 
 export const DEFAULT_PERMISSION_MODE = 'default';

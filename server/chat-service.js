@@ -7,7 +7,7 @@
  * - createChatService — 创建可注入依赖的聊天服务实例。
  * - normalizeSelectedSkills — 再导出自 chat-request-prep。
  *
- * Inward（本模块依赖/组装的关键符号）: chat-queue、chat-delivery（headless）、chat-request-prep、chat-image-handler、desktop-ipc、runtime-debug。
+ * Inward（本模块依赖/组装的关键符号）: chat-queue、chat-delivery（headless）、chat-request-prep、chat-image-handler、interaction-requests、desktop-ipc、runtime-debug。
  *
  * Outward（谁在用/调用场景）: HTTP 聊天路由或上层服务装配。
  *
@@ -39,6 +39,7 @@ import {
   runtimeDebugLine
 } from './runtime-debug.js';
 import { compactDesktopFollowerThread } from './desktop-ipc-client.js';
+import { createInteractionBroker } from './interaction-requests.js';
 
 export { normalizeSelectedSkills } from './chat-request-prep.js';
 
@@ -140,6 +141,18 @@ export function createChatService({
     broadcast(enriched);
   }
 
+  const interactionBroker = createInteractionBroker({
+    broadcast: (payload) => broadcast(payload)
+  });
+
+  function requestCodexInteraction(job, appMessage, context = {}) {
+    return interactionBroker.requestFromAppServer(appMessage, {
+      projectId: job.project.id,
+      sessionId: context.sessionId || job.selectedSessionId || job.draftSessionId || '',
+      turnId: context.turnId || job.turnId || ''
+    });
+  }
+
   const { scheduleAutoNameCompletedSession } = createChatAutoNamer({
     getTurn: chatQueue.getTurn,
     refreshCodexCache,
@@ -232,6 +245,7 @@ export function createChatService({
       rememberLiveSession,
       notifyDesktopThreadListChanged,
       triggerDesktopRefreshForThread,
+      requestCodexInteraction,
       emitJobEvent,
       scheduleAutoNameCompletedSession,
       onQueueDrained: () => setTimeout(() => runNextQueuedChat(queueKey), 0)
@@ -525,6 +539,7 @@ export function createChatService({
     const sessionId = String(body.sessionId || '').trim();
     const previousSessionId = String(body.previousSessionId || '').trim();
     console.log(`[chat] abort request remote=${remoteAddress} turn=${turnId} session=${sessionId}`);
+    interactionBroker.cancelInteractionsForRun({ turnId, sessionId });
     runtimeDebugLine('abortChat.enter', {
       remoteAddress,
       turnId,
@@ -712,6 +727,9 @@ export function createChatService({
     getTurn(turnId) {
       return chatQueue.getTurn(turnId);
     },
+    listPendingInteractions: interactionBroker.listPendingInteractions,
+    respondInteraction: interactionBroker.respondInteraction,
+    cancelInteraction: interactionBroker.cancelInteraction,
     loadRecentImagePrompts: chatImage.loadRecentImagePrompts,
     listQueue: chatQueue.listQueue,
     removeQueuedDraft: chatQueue.removeQueuedDraft,

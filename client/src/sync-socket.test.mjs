@@ -115,6 +115,39 @@ test('final answer assistant deltas still render as assistant chat bubbles', () 
   assert.equal(result.messages[0].content, '最终回答正在输出。');
 });
 
+test('interaction sync events insert and resolve pending request messages', () => {
+  const requested = applyWithMessages([], {
+    eventType: 'interaction.requested',
+    source: 'headless-local',
+    sessionId: 'thread-1',
+    turnId: 'turn-1',
+    status: 'pending',
+    interaction: {
+      id: 'interaction-1',
+      kind: 'user_input',
+      title: '检查方式',
+      questions: [{ id: 'check_method', question: '怎么检查？', options: [] }]
+    }
+  });
+
+  assert.equal(requested.handled, true);
+  assert.equal(requested.messages.length, 1);
+  assert.equal(requested.messages[0].role, 'interaction_request');
+  assert.equal(requested.messages[0].interaction.title, '检查方式');
+
+  const resolved = applyWithMessages(requested.messages, {
+    eventType: 'interaction.resolved',
+    source: 'headless-local',
+    sessionId: 'thread-1',
+    turnId: 'turn-1',
+    status: 'completed',
+    interactionId: 'interaction-1'
+  });
+
+  assert.equal(resolved.handled, true);
+  assert.deepEqual(resolved.messages, []);
+});
+
 test('commentary assistant event removes earlier same item assistant bubble', () => {
   const prematureBubble = applyWithMessages([], {
     eventType: 'message.assistant.delta',

@@ -1,18 +1,19 @@
 /**
- * 应用冷启动与认证后装载：拉取 `status`、项目与会话列表，按本地 remembered 选择恢复选中项并拉取首屏消息。
+ * 应用冷启动与认证后装载：拉取 `status`、项目、会话、消息与 pending 交互请求。
  *
  * Keywords: bootstrap, load-status, session-restore
  *
  * Exports:
  * - `useAppBootstrap` — `loadStatus`、`loadProjects` 等启动向方法集合的 hook。
  *
- * Inward: `api`；`session-utils`、`context-status`、`selection-persistence`。
+ * Inward: `api`；`session-utils`、`context-status`、`interaction-model`、`selection-persistence`。
  *
  * Outward: `App.jsx` 首次与重登后的数据装载。
  */
 
 import { useCallback } from 'react';
 import { apiFetch, clearToken } from '../api.js';
+import { upsertInteractionRequestMessage } from '../chat/interaction-model.js';
 import {
   emptyContextStatus,
   emptyMessagePage,
@@ -106,7 +107,15 @@ export function useAppBootstrap({
         setContextStatus(normalizeContextStatus(next.context || defaultStatus.context, defaultStatus.context));
         const messageData = await apiFetch(sessionMessagesApiPath(next.id));
         if (selectedSessionRef.current?.id === next.id) {
-          setMessages(messageData.messages || []);
+          const pendingInteractions = await apiFetch(`/api/chat/interactions?sessionId=${encodeURIComponent(next.id)}`)
+            .then((result) => result.interactions || [])
+            .catch(() => []);
+          setMessages(
+            pendingInteractions.reduce(
+              (current, interaction) => upsertInteractionRequestMessage(current, { interaction, sessionId: next.id, turnId: interaction.turnId }),
+              messageData.messages || []
+            )
+          );
           setMessagePage(messagePageFromResponse(messageData));
           setContextStatus(normalizeContextStatus(messageData.context || next.context || defaultStatus.context, defaultStatus.context));
         }

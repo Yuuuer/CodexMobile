@@ -31,6 +31,38 @@ export function createChatRouteHandler({
       return false;
     }
 
+    if (method === 'GET' && pathname === '/api/chat/interactions') {
+      sendJson(res, 200, {
+        interactions: chatService.listPendingInteractions({
+          sessionId: url.searchParams.get('sessionId') || '',
+          turnId: url.searchParams.get('turnId') || ''
+        })
+      });
+      return true;
+    }
+
+    if (method === 'POST' && parts.length === 5 && parts[0] === 'api' && parts[1] === 'chat' && parts[2] === 'interactions' && parts[4] === 'respond') {
+      const body = await readBody(req);
+      try {
+        const result = await chatService.respondInteraction(decodeURIComponent(parts[3]), body);
+        sendJson(res, 200, result);
+      } catch (error) {
+        sendJson(res, error.statusCode || 500, { error: error.message || 'Failed to respond to interaction' });
+      }
+      return true;
+    }
+
+    if (method === 'POST' && parts.length === 5 && parts[0] === 'api' && parts[1] === 'chat' && parts[2] === 'interactions' && parts[4] === 'cancel') {
+      const body = await readBody(req);
+      try {
+        const result = await chatService.cancelInteraction(decodeURIComponent(parts[3]), body);
+        sendJson(res, 200, result);
+      } catch (error) {
+        sendJson(res, error.statusCode || 500, { error: error.message || 'Failed to cancel interaction' });
+      }
+      return true;
+    }
+
     if (method === 'GET' && parts.length === 4 && parts[0] === 'api' && parts[1] === 'chat' && parts[2] === 'turns') {
       const turnId = decodeURIComponent(parts[3]);
       sendJson(res, 200, { turn: chatService.getTurn(turnId) });
